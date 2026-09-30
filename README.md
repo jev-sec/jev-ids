@@ -34,7 +34,7 @@ The same flows, examples and 0.5 cut go to two baselines: an LLM through an Agno
 ## Try it
 
 ```bash
-git clone https://github.com/jev-ids/jev-ids.git
+git clone https://github.com/jev-sec/jev-ids.git
 cd jev-ids
 uv sync
 # .env: TYPESAFE_API_KEY for Jev. Gemini needs `gcloud auth application-default login` and GOOGLE_GENAI_USE_VERTEXAI=true,
