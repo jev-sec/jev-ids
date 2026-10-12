@@ -1,11 +1,11 @@
-"""The command line: `jev-ids run|metrics|compare`, also reachable as `python -m jev_ids`.
+"""The command line: `jev-ids run|redo-errors|metrics|compare|sign-test`, also reachable as `python -m jev_ids`.
 
 In reading order:
 
 - `parse_k` and `parse_list`: the list arguments (`--k 0,1,all`).
-- `build_parser`: the three subcommands and their arguments.
-- `run_command`, `metrics_command`, `compare_command`: one handler per subcommand, each turning the parsed arguments into calls of `run` or
-  `metrics`.
+- `build_parser`: the five subcommands and their arguments.
+- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`: one handler per subcommand, each turning
+  the parsed arguments into calls of `run` or `metrics`.
 - `print_csv`: a table as CSV on stdout.
 - `main`: parse, dispatch, return the exit code.
 
@@ -40,7 +40,7 @@ def parse_list(text: str) -> tuple[int | None, ...]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """The four subcommands; each one carries the function that handles it."""
+    """The five subcommands; each one carries the function that handles it."""
     parser = argparse.ArgumentParser(prog="jev-ids")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -80,6 +80,11 @@ def build_parser() -> argparse.ArgumentParser:
     comparer.add_argument("--k-a", help="cut run A to this k or `all`")
     comparer.add_argument("--k-b", help="cut run B to this k or `all`")
     comparer.set_defaults(handler=compare_command)
+
+    signer = commands.add_parser("sign-test", help="flow-level sign test of two detectors on every subset and k, Holm-adjusted")
+    signer.add_argument("--a", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector A")
+    signer.add_argument("--b", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector B")
+    signer.set_defaults(handler=sign_test_command)
     return parser
 
 
@@ -118,6 +123,21 @@ def compare_command(args: argparse.Namespace) -> None:
     run_a = metrics.only_subset([p for run_dir in args.a for p in read_predictions(run_dir)], args.subset)
     run_b = metrics.only_subset([p for run_dir in args.b for p in read_predictions(run_dir)], args.subset)
     print_csv(metrics.compare(run_a, run_b, across_k))
+
+
+def sign_test_command(args: argparse.Namespace) -> None:
+    """`sign-test`: the flow-level sign test on all flows, known and novel attacks, with Holm's adjustment across every row, as CSV."""
+    run_a = [p for run_dir in args.a for p in read_predictions(run_dir)]
+    run_b = [p for run_dir in args.b for p in read_predictions(run_dir)]
+    table = [
+        {"subset": subset, **row}
+        for subset in ("all", "known", "novel")
+        for row in metrics.sign_test(metrics.only_subset(run_a, subset), metrics.only_subset(run_b, subset))
+    ]
+    # Adjusting the family of every subset and k together, the 15 comparisons of the paper's Table 4.
+    for row, adjusted in zip(table, metrics.holm([float(row["sign_p"]) for row in table]), strict=True):
+        row["holm_p"] = adjusted
+    print_csv(table)
 
 
 def print_csv(rows: Sequence[dict[str, Any]]) -> None:

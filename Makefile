@@ -55,5 +55,13 @@ paper-random-forest:
 paper-isolation-forest:
 	$(PAPER_RUN) --detector isolation_forest --k all
 
+# The tables of the paper: the summary (Tables 2, 3 and 5), the flow-level sign tests (Table 4 and Jev against the Random Forest) and the
+# McNemar test per seed.
 paper-summary:
 	uv run jev-ids metrics results/paper/*/ > results/paper/summary.csv
+	uv run jev-ids sign-test --a results/paper/*-jev-paper/ --b results/paper/*-llm-gemini-paper/ > results/paper/sign-test-jev-gemini.csv
+	uv run jev-ids sign-test --a results/paper/*-jev-paper/ --b results/paper/*-random_forest-paper/ > results/paper/sign-test-jev-random_forest.csv
+	for subset in all known novel; do \
+	  uv run jev-ids compare --a results/paper/*-jev-paper/ --b results/paper/*-llm-gemini-paper/ --subset $$subset \
+	    > results/paper/compare-jev-gemini-$$subset.csv; \
+	done

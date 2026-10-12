@@ -82,8 +82,9 @@ def test_scores_break_recall_down_by_category_and_rank_p_attack_without_the_cut(
     ]
     rows[2]["category_true"] = "probe"
     scores = metrics.scores(rows)
-    assert (scores["recall_dos"], scores["recall_novel_dos"]) == (0.5, 1.0)
-    assert (scores["recall_probe"], scores["recall_novel_probe"]) == (1.0, None)
+    assert (scores["recall_dos"], scores["recall_known_dos"], scores["recall_novel_dos"]) == (0.5, 0.0, 1.0)
+    assert (scores["recall_probe"], scores["recall_known_probe"], scores["recall_novel_probe"]) == (1.0, 1.0, None)
+    assert (scores["false_alarms"], scores["missed_attacks"]) == (1, 1)
     # Ranked by p_attack: 0.9 (attack), 0.7 (attack), 0.6 (normal), 0.4 (attack), 0.1 (normal). Average precision is the mean of the
     # precision at each attack, 1, 1 and 3/4; ROC-AUC is the share of (attack, normal) pairs ranked right, 5 of 6.
     assert scores["pr_auc"] == pytest.approx((1 + 1 + 3 / 4) / 3)
@@ -93,7 +94,19 @@ def test_scores_break_recall_down_by_category_and_rank_p_attack_without_the_cut(
     assert metrics.scores(rows)["roc_auc"] == pytest.approx(3 / 6)
     # The keys of one cell come in a fixed order, categories sorted, so the summary columns are stable.
     assert list(scores)[:5] == ["f1", "precision", "recall", "recall_novel", "recall_known"]
-    assert list(scores)[5:] == ["recall_dos", "recall_novel_dos", "recall_probe", "recall_novel_probe", "pr_auc", "roc_auc", "error_rate"]
+    assert list(scores)[5:] == [
+        "recall_dos",
+        "recall_known_dos",
+        "recall_novel_dos",
+        "recall_probe",
+        "recall_known_probe",
+        "recall_novel_probe",
+        "false_alarms",
+        "missed_attacks",
+        "pr_auc",
+        "roc_auc",
+        "error_rate",
+    ]
 
 
 def test_cost_usd_per_1m_prices_the_usage_at_list_price() -> None:
@@ -226,7 +239,7 @@ def test_compare_orders_k_and_fills_every_field() -> None:
     results = metrics.compare([*a_k8, *a], [*b_k8, *b])
     assert [(r["k_a"], r["k_b"], r["repetition"]) for r in results] == [(0, 0, 0), (8, 8, 0)]
     first = results[0]
-    assert list(first) == ["k_a", "k_b", "repetition", "pairs", "discordant", "a_correct", "b_correct", "mcnemar_p", "f1_a", "f1_b"]
+    assert list(first) == ["k_a", "k_b", "seed", "repetition", "pairs", "discordant", "a_correct", "b_correct", "mcnemar_p", "f1_a", "f1_b"]
     assert (first["pairs"], first["discordant"]) == (10, 5)
     assert (first["a_correct"], first["b_correct"]) == (4, 1)
     assert first["mcnemar_p"] == pytest.approx(2 * 6 / 32)
@@ -244,3 +257,44 @@ def test_compare_pairs_old_rows_with_new_ones_and_unrelated_runs_give_nothing() 
     # Another split shares no row_id: nothing to pair, as with an empty run.
     assert metrics.compare(a, [make(99, 1, 1.0, split="hard")]) == []
     assert metrics.compare(a, []) == []
+
+
+def test_usage_reads_median_and_p95_latency_of_successful_calls_only() -> None:
+    rows = [make(i, 1, 0.9) for i in range(1, 21)]
+    for index, row in enumerate(rows, start=1):
+        row["latency_ms"] = float(index)
+    failed = make(99, 1, None, error="HTTP 504")
+    failed["latency_ms"] = 10_000.0
+    summary = metrics.usage([*rows, failed], PRICES)
+    assert summary["latency_ms_median"] == 10.5
+    assert summary["latency_ms_p95"] == pytest.approx(statistics.quantiles(range(1, 21), n=20)[-1])
+    # A single successful call has a median but no 95th percentile.
+    assert metrics.usage(rows[:1], PRICES)["latency_ms_p95"] is None
+
+
+def test_holm_multiplies_by_rank_keeps_order_and_caps_at_one() -> None:
+    assert metrics.holm([0.01, 0.04, 0.03]) == pytest.approx([0.03, 0.06, 0.06])
+    assert metrics.holm([0.5, 0.9]) == [1.0, 1.0]
+    assert metrics.holm([]) == []
+
+
+def test_sign_test_counts_flows_by_seeds_right_and_drops_ties() -> None:
+    # Flow 1: A right in both seeds, B in one. Flow 2: both right in both seeds (a tie). Flow 3: B right in both, A in none.
+    run_a = [make(1, 1, 1.0, seed=0), make(1, 1, 1.0, seed=1), make(2, 0, 0.0, seed=0), make(2, 0, 0.0, seed=1)]
+    run_a += [make(3, 1, 0.0, seed=0), make(3, 1, 0.0, seed=1)]
+    run_b = [make(1, 1, 1.0, seed=0), make(1, 1, 0.0, seed=1), make(2, 0, 0.0, seed=0), make(2, 0, 0.0, seed=1)]
+    run_b += [make(3, 1, 1.0, seed=0), make(3, 1, 1.0, seed=1), make(4, 1, 1.0, k=8)]
+    assert metrics.sign_test(run_a, run_b) == [{"k": 1, "flows": 3, "a_better": 1, "b_better": 1, "sign_p": 1.0}]
+
+
+def test_usage_reports_how_often_gemini_thinks_and_reads_from_cache() -> None:
+    rows = [make(i, 1, 0.9) for i in range(4)]
+    rows[0]["usage"] |= {"reasoning_tokens": 200, "cache_read_tokens": 50}
+    rows[1]["usage"] |= {"reasoning_tokens": 100}
+    rows[2]["usage"] |= {"reasoning_tokens": 0}
+    summary = metrics.usage(rows, PRICES)
+    assert summary["reasoning_share"] == 0.5
+    assert summary["reasoning_tokens_when_used_mean"] == 150.0
+    assert summary["cache_read_share"] == 0.25
+    # A Detector that never reports these fields leaves them empty.
+    assert metrics.usage(rows[3:], PRICES)["reasoning_share"] is None
