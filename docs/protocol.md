@@ -17,7 +17,7 @@ Random Forest and an unsupervised Isolation Forest, and at what cost and latency
 | Pool             | `data/nsl-kdd/pool.csv`, KDDTrain+ converted once by `scripts/prepare_nsl_kdd.py`    | 125,973 flows, not in git                                                                                                                                                                             |
 | `paper` split    | `data/nsl-kdd/splits/paper.csv`, drawn by `scripts/draw_split.py` with seed 20260920 | 2,000 flows of KDDTest+ (874 normal, 642 dos, 248 r2l, 213 probe, 23 u2r), 300 of them novel attacks; disjoint from `internal`, `pilot`, `smoke`, `hard` and `mid`; sha256 written into `config.json` |
 | Jev request      | `prompts/nsl-kdd/jev.json`                                                           | `prompt_hash` in every row; model `jev-1.13.0`, and every row records the version that answered                                                                                                       |
-| LLM instructions | `prompts/nsl-kdd/llm.md`                                                             | `prompt_hash` in every row; model `gpt-5.6-luna` through the ChatGPT Codex backend                                                                                                                    |
+| LLM instructions | `prompts/nsl-kdd/llm.md`                                                             | `prompt_hash` in every row, model `gemini-3.6-flash` on Vertex AI through Agno, `thinking_level="low"`, temperature 0                                                                                 |
 | Forests          | scikit-learn 1.9.1 (`uv.lock`), 100 trees, `random_state = 0`                        | the Isolation Forest is fitted on the 67,343 benign flows of the pool                                                                                                                                 |
 | Prices           | `prices.json`                                                                        | list prices per 1M tokens, dated                                                                                                                                                                      |
 | Code             | this repository                                                                      | `code_commit` in `config.json`, `-dirty` when the tree had uncommitted changes                                                                                                                        |
@@ -55,11 +55,11 @@ make paper-summary
 ```
 
 `make paper-summary` writes every table of the paper from `predictions.jsonl`: `summary.csv`, `sign-test-jev-gemini.csv`,
-`sign-test-jev-random_forest.csv` and `compare-jev-gemini-{all,known,novel}.csv` in `results/paper/`. Other pairs run the same way:
+`sign-test-jev-random_forest.csv` and `compare-jev-gemini-{all,known,novel}.csv` in `results/paper/`. Each command also runs alone, for these pairs or others:
 
 ```bash
-uv run jev-ids sign-test --a results/paper/<jev> --b results/paper/*llm-openai*
-uv run jev-ids compare --a results/paper/<jev> --b results/paper/*llm-openai* --subset novel
+uv run jev-ids sign-test --a results/paper/<jev> --b results/paper/*-llm-gemini-paper/
+uv run jev-ids compare --a results/paper/<jev> --b results/paper/*-llm-gemini-paper/ --subset novel
 uv run jev-ids compare --a results/paper/<jev> --b results/paper/<random_forest> --k-a 1 --k-b all
 uv run jev-ids compare --a results/paper/<jev> --b results/paper/<isolation_forest> --k-a 0 --k-b all
 ```
@@ -76,11 +76,11 @@ forests at k = all. Tables and figures are regenerated from `predictions.jsonl`;
 
 ## What the protocol does not fix
 
-- Cost is tokens times list price, not what was billed. The GPT-5.6 calls went through a ChatGPT subscription and are priced at the public
-  API rate; Jev is priced at TypeSafe's list rate.
-- Latency is the wall clock around the successful HTTP call from the client, TypeSafe's API for Jev and the Codex backend for the LLM,
+- Cost is tokens times list price, not what was billed. Gemini is priced at its paid-tier list rate through 2026-12-31, with reasoning
+  tokens billed as output, and Jev at TypeSafe's list rate. Both rates are in `prices.json`.
+- Latency is the wall clock around the successful HTTP call from the client, TypeSafe's API for Jev and Vertex AI for Gemini,
   without the failed attempts (`retries` counts them). The forests report the time of `predict_proba` or `score_samples` and the fit.
-- Provider-side changes. Jev is pinned by the version the answer reports; GPT-5.6 only by its model id.
+- Provider-side changes. Jev is pinned by the version the answer reports, and Gemini only by its model id.
 
 ## Adding a detector
 
