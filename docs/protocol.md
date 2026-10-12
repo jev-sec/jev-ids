@@ -51,18 +51,28 @@ counted as normal (fail-open) and as the lowest-ranked flow in the areas.
 ## Tables
 
 ```bash
-uv run jev-ids metrics results/paper/*/ > results/paper/summary.csv
-uv run jev-ids compare --a results/paper/<jev> --b results/paper/*llm-openai*
+make paper-summary
+```
+
+`make paper-summary` writes every table of the paper from `predictions.jsonl`: `summary.csv`, `sign-test-jev-gemini.csv`,
+`sign-test-jev-random_forest.csv` and `compare-jev-gemini-{all,known,novel}.csv` in `results/paper/`. Other pairs run the same way:
+
+```bash
+uv run jev-ids sign-test --a results/paper/<jev> --b results/paper/*llm-openai*
 uv run jev-ids compare --a results/paper/<jev> --b results/paper/*llm-openai* --subset novel
 uv run jev-ids compare --a results/paper/<jev> --b results/paper/<random_forest> --k-a 1 --k-b all
 uv run jev-ids compare --a results/paper/<jev> --b results/paper/<isolation_forest> --k-a 0 --k-b all
 ```
 
 `summary.csv` has one row per detector and k: F1, precision and recall of the attack class at the 0.5 cut, recall on novel and on known
-attacks, recall and novel recall per category (`recall_dos`, `recall_novel_dos`, …), PR-AUC (average precision) and ROC-AUC of p_attack,
-the error rate, the mean and sd of F1 over the seeds, mean tokens, list cost per 1M flows and mean latency. `compare` pairs two detectors
-flow by flow within a cell, over as many run directories per side as they were run in, and reports the discordant pairs, who was right in them and McNemar's exact p; `--k-a`/`--k-b` pair across k,
-which is how few-shot Jev meets the forests at k = all. Tables and figures are regenerated from `predictions.jsonl`; none is edited by hand.
+attacks, recall per category on all, known and novel attacks (`recall_dos`, `recall_known_dos`, `recall_novel_dos`, …), false alarms
+and missed attacks per seed, PR-AUC (average precision) and ROC-AUC of p_attack, the error rate, the mean and sd of F1 over the seeds,
+mean tokens, the share of calls with reasoning and with cache reads, list cost per 1M flows, and the mean latency of every call with the
+median and 95th percentile of the successful ones. `sign-test` takes the flow as the unit. For each k it counts the flows a detector
+judged right in more seeds than the other and runs an exact sign test on all flows, known and novel attacks, Holm-adjusted together.
+`compare` pairs two detectors flow by flow within a seed, over as many run directories per side as they were run in, and reports the
+discordant pairs, who was right in them and McNemar's exact p; `--k-a`/`--k-b` pair across k, which is how few-shot Jev meets the
+forests at k = all. Tables and figures are regenerated from `predictions.jsonl`; none is edited by hand.
 
 ## What the protocol does not fix
 

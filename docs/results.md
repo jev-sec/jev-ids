@@ -10,18 +10,19 @@ Jev is `jev-1.13.0` through the TypeSafe SDK; Gemini is `gemini-3.6-flash` on Ve
   8 probe, 8 r2l and 8 u2r flows, each with its label.
 - **Zero-day attack**: a flow whose attack type is absent from the example pool (`novel_attack` in the split), so no k can show an example
   of it. **Known attack**: an attack type present in the pool.
-- **Discordant pairs**: flows where the two detectors gave different verdicts (one said attack, the other normal) on the same flow, seed
-  and k. Only these separate the two; "Jev right" counts how many of them Jev got right, the rest Gemini got right.
-- **p**: exact two-sided McNemar test on the discordant pairs, the probability of a split at least this uneven if both detectors were
-  equally good. Below 0.05 the difference is not chance; 0.35 could be.
+- **Flow favoring a detector**: a flow that detector judged right in more of the three seeds than the other. The seeds of a flow are
+  not independent, so the flow is the unit of the paired test, and a flow both detectors judged right equally often is a tie.
+- **p**: exact two-sided sign test on the flows favoring each detector, the probability of a split at least this uneven if both
+  detectors were equally good. The 15 Jev-Gemini tests (three cuts, five k) are Holm-adjusted together. Below 0.05 the difference is
+  not chance.
 
 ## Reading
 
-Gemini 3.6 Flash is the best detector on F1 over all flows at every k (paired McNemar p < 0.001), and on known-type attacks. Jev is
-second, with the same precision (0.94 to 0.97 against 0.94 to 0.95), 6 to 9 times lower latency and 10 to 25 times lower cost. On
-zero-day attacks Jev is the best detector from k = 1 to k = 8 among those that keep precision above 0.8; the Random Forest catches
-more zero-day attacks only by alerting on 32 to 87% of the normal flows. The Isolation Forest is the conservative reference: precision
-0.97, recall 0.62.
+Gemini 3.6 Flash is the best detector on F1 over all flows at every k (sign test, adjusted p < 0.001), and on known-type attacks. Jev is
+second, with the same precision (0.94 to 0.97 against 0.94 to 0.95), 4.3 to 6.7 times lower median latency and 10 to 25 times lower
+cost. On zero-day attacks Jev has the highest mean recall from k = 1 to k = 8 among those that keep precision above 0.8, a difference
+the paired test confirms only at k = 1 and 2. The Random Forest catches more zero-day attacks only by alerting on 32 to 87% of the
+normal flows. The Isolation Forest is the conservative reference: precision 0.97, recall 0.62.
 
 ## One metric, three attack sets
 
@@ -54,33 +55,32 @@ does, which is why it is not used here.
 | Random Forest    | all | 0.765  | 0.854    | 0.395       | 0.971         | 0.790              | 0.631      | 0.764        | 0.263           |
 | Isolation Forest | all | 0.761  | 0.772    | 0.701       | 0.974         | 0.901              | 0.624      | 0.643        | 0.573           |
 
-## F1 per k, paired
+## Paired comparison, flow by flow
 
-![F1 per k: Jev against Gemini 3.6 Flash, in three cuts](results-f1.svg)
+`jev-ids sign-test` writes this table to `results/paper/sign-test-jev-gemini.csv`. "Known" and "zero-day" hold attack flows only.
 
-The cuts of this table and figure are the ones `jev-ids compare --subset` produces: "known attacks" and "zero-day" hold attack flows
-only, so their F1 follows recall; the paired test on discordant flows is what the table is for.
+| Cut       | k   | Flows | Jev better | Gemini better | Adjusted p |
+| --------- | --- | ----- | ---------- | ------------- | ---------- |
+| All flows | 0   | 2,000 | 114        | 247           | < 0.001    |
+| All flows | 1   | 2,000 | 111        | 208           | < 0.001    |
+| All flows | 2   | 2,000 | 131        | 225           | < 0.001    |
+| All flows | 4   | 2,000 | 114        | 226           | < 0.001    |
+| All flows | 8   | 2,000 | 116        | 218           | < 0.001    |
+| Known     | 0   | 826   | 16         | 171           | < 0.001    |
+| Known     | 1   | 826   | 17         | 157           | < 0.001    |
+| Known     | 2   | 826   | 11         | 158           | < 0.001    |
+| Known     | 4   | 826   | 18         | 136           | < 0.001    |
+| Known     | 8   | 826   | 15         | 126           | < 0.001    |
+| Zero-day  | 0   | 300   | 43         | 67            | 0.084      |
+| Zero-day  | 1   | 300   | 53         | 26            | 0.013      |
+| Zero-day  | 2   | 300   | 77         | 37            | 0.001      |
+| Zero-day  | 4   | 300   | 54         | 55            | 1.000      |
+| Zero-day  | 8   | 300   | 69         | 49            | 0.160      |
 
-| Cut           | k   | F1 Jev | F1 Gemini | Discordant | Jev right | Gemini right | p       | Winner |
-| ------------- | --- | ------ | --------- | ---------- | --------- | ------------ | ------- | ------ |
-| All flows     | 0   | 0.782  | 0.867     | 833        | 213       | 620          | < 0.001 | Gemini |
-| All flows     | 1   | 0.857  | 0.880     | 508        | 195       | 313          | < 0.001 | Gemini |
-| All flows     | 2   | 0.846  | 0.869     | 515        | 199       | 316          | < 0.001 | Gemini |
-| All flows     | 4   | 0.857  | 0.884     | 506        | 178       | 328          | < 0.001 | Gemini |
-| All flows     | 8   | 0.854  | 0.882     | 472        | 159       | 313          | < 0.001 | Gemini |
-| Known attacks | 0   | 0.799  | 0.914     | 489        | 25        | 464          | < 0.001 | Gemini |
-| Known attacks | 1   | 0.883  | 0.928     | 266        | 38        | 228          | < 0.001 | Gemini |
-| Known attacks | 2   | 0.872  | 0.919     | 235        | 22        | 213          | < 0.001 | Gemini |
-| Known attacks | 4   | 0.891  | 0.934     | 227        | 24        | 203          | < 0.001 | Gemini |
-| Known attacks | 8   | 0.892  | 0.929     | 190        | 18        | 172          | < 0.001 | Gemini |
-| Zero-day      | 0   | 0.767  | 0.814     | 206        | 74        | 132          | < 0.001 | Gemini |
-| Zero-day      | 1   | 0.855  | 0.833     | 118        | 74        | 44           | 0.007   | Jev    |
-| Zero-day      | 2   | 0.849  | 0.813     | 162        | 105       | 57           | < 0.001 | Jev    |
-| Zero-day      | 4   | 0.845  | 0.835     | 167        | 90        | 77           | 0.353   | tie    |
-| Zero-day      | 8   | 0.838  | 0.825     | 171        | 94        | 77           | 0.221   | tie    |
-
-Pairs per k: 6,000 (all), 2,478 (known attacks), 900 (zero-day). Gemini wins on known attacks at every k; on zero-day attacks Jev wins at
-k = 1 and 2 and the two are indistinguishable at k = 4 and 8.
+Gemini wins on all flows and on known attacks at every k. On zero-day attacks Jev wins at k = 1 and 2, and the difference is not
+significant at k = 0, 4 and 8. The direction depends on the example draw: `jev-ids compare` runs the exact McNemar test per seed, and on
+zero-day attacks at k = 1 two seeds favor Jev (38 against 17 and 31 against 4 discordant flows) while the third favors Gemini (5 against
+23, p < 0.001).
 
 ## Recall on zero-day attacks, by category
 
@@ -102,14 +102,16 @@ The gap lives in zero-day r2l, where Jev reaches 0.26 recall with examples and G
 
 ## Cost and latency
 
-| k   | Cost Jev (USD / 1M flows) | Cost Gemini | Ratio | Latency Jev | Latency Gemini | Ratio |
-| --- | ------------------------- | ----------- | ----- | ----------- | -------------- | ----- |
-| 0   | 43                        | 1,068       | 25×   | 310 ms      | 2.24 s         | 7.2×  |
-| 1   | 74                        | 1,651       | 22×   | 315 ms      | 2.42 s         | 7.7×  |
-| 2   | 106                       | 2,409       | 23×   | 308 ms      | 2.65 s         | 8.6×  |
-| 4   | 169                       | 2,869       | 17×   | 322 ms      | 2.13 s         | 6.6×  |
-| 8   | 295                       | 3,035       | 10×   | 335 ms      | 1.99 s         | 5.9×  |
+| k   | Cost Jev (USD / 1M flows) | Cost Gemini | Ratio | Latency Jev  | Latency Gemini | Ratio |
+| --- | ------------------------- | ----------- | ----- | ------------ | -------------- | ----- |
+| 0   | 43                        | 1,068       | 25×   | 300 (382) ms | 1.42 (3.33) s  | 4.7×  |
+| 1   | 74                        | 1,651       | 22×   | 307 (383) ms | 1.65 (3.65) s  | 5.4×  |
+| 2   | 106                       | 2,409       | 23×   | 302 (368) ms | 2.03 (4.33) s  | 6.7×  |
+| 4   | 169                       | 2,869       | 17×   | 314 (390) ms | 1.44 (2.91) s  | 4.6×  |
+| 8   | 295                       | 3,035       | 10×   | 325 (412) ms | 1.38 (2.81) s  | 4.3×  |
 
+Latency is the median (95th percentile) of the successful requests, `latency_ms_median` and `latency_ms_p95` in `summary.csv`, and the
+latency ratio uses the medians. A few stalled Gemini requests lasted minutes, so the mean (`latency_ms_mean`) overstates a typical call.
 Cost is list price for one million flows: the tokens of a call times the per-million-token prices, Gemini's thinking tokens billed as
 output. The ratio narrows at k = 8 because Vertex served 4,004 of the 6,269 input tokens from cache at a tenth of the price; Jev has no
 cache. Gemini's price is the promotional one through 2026-12-31 and doubles on 2027-01-01. Gemini's latency was measured with five
@@ -123,8 +125,11 @@ make paper-summary
 uv run jev-ids compare --a results/paper/*-jev-paper/ --b results/paper/*-llm-gemini-paper/ --subset all
 uv run jev-ids compare --a results/paper/*-jev-paper/ --b results/paper/*-llm-gemini-paper/ --subset known
 uv run jev-ids compare --a results/paper/*-jev-paper/ --b results/paper/*-llm-gemini-paper/ --subset novel
+uv run jev-ids sign-test --a results/paper/*-jev-paper/ --b results/paper/*-llm-gemini-paper/
+uv run jev-ids sign-test --a results/paper/*-jev-paper/ --b results/paper/*-random_forest-paper/
 ```
 
-The three `compare` outputs are saved as `results/paper/compare-jev-gemini-{all,known,novel}.csv`; `--subset novel` is the zero-day cut.
+The three `compare` outputs (McNemar per seed) are saved as `results/paper/compare-jev-gemini-{all,known,novel}.csv`, where
+`--subset novel` is the zero-day cut. The two `sign-test` outputs are `results/paper/sign-test-jev-{gemini,random_forest}.csv`.
 Every run directory holds `config.json` (spec, hashes of card, split and prompt, code commit, `redone` passes) and `predictions.jsonl`
 (one row per flow, k, seed and repetition). `responses.jsonl`, the raw model answers, stays out of git.

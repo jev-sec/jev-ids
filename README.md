@@ -4,16 +4,16 @@
 
 ![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-0B6B3A?style=flat&labelColor=121917) ![Detector Jev, from TypeSafe](https://img.shields.io/badge/detector-Jev%20%28TypeSafe%29-0B6B3A?style=flat&labelColor=121917) ![Dataset NSL-KDD](https://img.shields.io/badge/dataset-NSL--KDD-0B6B3A?style=flat&labelColor=121917) ![License MIT](https://img.shields.io/badge/license-MIT-0B6B3A?style=flat&labelColor=121917)
 
-**Intrusion detection in one request. Show [TypeSafe's Jev](https://docs.typesafe.ai/introduction) one network flow and five labeled examples. It answers whether the flow is an attack and which kind, in half a second, with no text to parse.**
+**Intrusion detection in one request. Show [TypeSafe's Jev](https://docs.typesafe.ai/introduction) one network flow and five labeled examples. It answers whether the flow is an attack and which kind, in under half a second, with no text to parse.**
 
 Jev IDS was tested on NSL-KDD, a reference benchmark of the cybersecurity community, against a state-of-the-art LLM (Gemini 3.6 Flash on Vertex AI), a classic machine-learning model (Random Forest) and an unsupervised one (Isolation Forest): 2,000 flows, three seeds, k from 0 to 8 examples per category. Given the same five examples (k = 1), Jev IDS was:
 
-- **7.7× faster** than the LLM: 0.32 s against 2.42 s per flow.
+- **5.4× faster** than the LLM: a median of 0.31 s against 1.65 s per flow.
 - **22× cheaper** than the LLM: $74 against $1,651 per million flows, at list prices.
 - **As precise as the LLM**: 0.953 against 0.942.
 - **18× fewer false alarms** than the Random Forest: 43 against 764 on the same 874 benign flows.
 
-The LLM is the better detector on F1: 0.880 against Jev's 0.856 at k = 1, and ahead at every k (McNemar p < 0.001), because it catches more attacks of the kinds shown in the examples. Jev is the second best, and on zero-day attacks, kinds absent from the examples, it catches more than the LLM from k = 1 to k = 8 (0.747 against 0.713 at k = 1). The numbers, the figures and their limits are in [Evidence and limits](#evidence-and-limits) and [docs/results.md](docs/results.md).
+The LLM is the better detector on F1: 0.880 against Jev's 0.856 at k = 1, and ahead at every k (flow-level sign test, Holm-adjusted p < 0.001), because it catches more attacks of the kinds shown in the examples. Jev is the second best, and on zero-day attacks, kinds absent from the examples, it catches more than the LLM on average from k = 1 to k = 8 (0.747 against 0.713 at k = 1), a difference the paired test confirms only at k = 1 and k = 2. The numbers, the figures and their limits are in [Evidence and limits](#evidence-and-limits) and [docs/results.md](docs/results.md).
 
 [Read the loop](jev_ids/run.py) · [The request template](prompts/nsl-kdd/jev.json) · [Glossary](CONTEXT.md)
 
@@ -61,7 +61,7 @@ uv run jev-ids metrics results/<run_id> [results/<run_id> ...] > results/summary
 uv run jev-ids compare --a results/<jev_run> --b results/<rf_run> --subset novel --k-a 0 --k-b all  # novel = zero-day attacks
 ```
 
-k is the number of labeled examples per category. k = 1 with five categories means five examples, and `all` means the whole pool. `metrics` prints one CSV row per detector and k with F1, recall on zero-day attacks (`novel` in the code) and per category, PR-AUC and ROC-AUC of p_attack, tokens, latency and cost. `compare` pairs two runs flow by flow and runs McNemar's test on the discordant pairs, because only the flows two detectors disagree on tell them apart. Cost is computed offline as tokens times the list prices in [`prices.json`](prices.json), for every detector alike.
+k is the number of labeled examples per category. k = 1 with five categories means five examples, and `all` means the whole pool. `metrics` prints one CSV row per detector and k with F1, recall on zero-day attacks (`novel` in the code) and per category, PR-AUC and ROC-AUC of p_attack, tokens, latency and cost. `compare` pairs two runs flow by flow and runs McNemar's exact test on the discordant pairs of each seed, because only the flows two detectors disagree on tell them apart. `sign-test` takes the flow as the unit across the three seeds and runs an exact sign test on all flows, known attacks and zero-day attacks, Holm-adjusted together. Cost is computed offline as tokens times the list prices in [`prices.json`](prices.json), for every detector alike.
 
 ## Reproduce the paper
 
@@ -78,18 +78,18 @@ k is the number of labeled examples per category. k = 1 with five categories mea
 
 ## Small enough to read
 
-| File                                                                   | Job                                                                           |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [cli.py](jev_ids/cli.py)                                               | `run`, `metrics` and `compare`                                                |
-| [dataset.py](jev_ids/dataset.py)                                       | The card, the pool, the splits and the k-shot example draw                    |
-| [run.py](jev_ids/run.py)                                               | The loop, cell by cell and flow by flow, and the three files of a run         |
-| [records.py](jev_ids/records.py)                                       | One prediction row and its JSONL                                              |
-| [metrics.py](jev_ids/metrics.py)                                       | F1, recall per category, PR-AUC, tokens, cost, latency, the paired comparison |
-| [detectors/jev.py](jev_ids/detectors/jev.py)                           | Jev through TypeSafe's API, one flow per request                              |
-| [detectors/llm.py](jev_ids/detectors/llm.py)                           | The LLM baselines through Agno                                                |
-| [detectors/random_forest.py](jev_ids/detectors/random_forest.py)       | The classical baseline                                                        |
-| [detectors/isolation_forest.py](jev_ids/detectors/isolation_forest.py) | The unsupervised baseline, fitted on benign traffic alone                     |
-| [prompts/nsl-kdd/](prompts/nsl-kdd)                                    | `jev.json`, the whole request template; `llm.md`, the agent's instructions    |
+| File                                                                   | Job                                                                        |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [cli.py](jev_ids/cli.py)                                               | `run`, `redo-errors`, `metrics`, `compare` and `sign-test`                 |
+| [dataset.py](jev_ids/dataset.py)                                       | The card, the pool, the splits and the k-shot example draw                 |
+| [run.py](jev_ids/run.py)                                               | The loop, cell by cell and flow by flow, and the three files of a run      |
+| [records.py](jev_ids/records.py)                                       | One prediction row and its JSONL                                           |
+| [metrics.py](jev_ids/metrics.py)                                       | F1, recall per category, PR-AUC, tokens, cost, latency, the paired tests   |
+| [detectors/jev.py](jev_ids/detectors/jev.py)                           | Jev through TypeSafe's API, one flow per request                           |
+| [detectors/llm.py](jev_ids/detectors/llm.py)                           | The LLM baselines through Agno                                             |
+| [detectors/random_forest.py](jev_ids/detectors/random_forest.py)       | The classical baseline                                                     |
+| [detectors/isolation_forest.py](jev_ids/detectors/isolation_forest.py) | The unsupervised baseline, fitted on benign traffic alone                  |
+| [prompts/nsl-kdd/](prompts/nsl-kdd)                                    | `jev.json`, the whole request template; `llm.md`, the agent's instructions |
 
 ## Evidence and limits
 
@@ -97,26 +97,26 @@ Paper split of NSL-KDD: 2,000 flows disjoint from the pilot, 1,126 of them attac
 
 | Detector         | k   | F1    | Precision | Recall | Zero-day recall | False alarms / 874 normal | Latency | Cost per 1M flows |
 | ---------------- | --- | ----- | --------- | ------ | --------------- | ------------------------- | ------- | ----------------- |
-| Jev              | 1   | 0.856 | 0.953     | 0.778  | 0.747           | 43                        | 0.32 s  | $74               |
-| Gemini 3.6 Flash | 1   | 0.880 | 0.942     | 0.826  | 0.713           | 57                        | 2.42 s  | $1,651            |
-| Random Forest    | 1   | 0.748 | 0.598     | 1.000  | 1.000           | 764                       | 3 ms    | local             |
-| Jev              | 8   | 0.854 | 0.942     | 0.783  | 0.721           | 56                        | 0.33 s  | $295              |
-| Gemini 3.6 Flash | 8   | 0.881 | 0.949     | 0.823  | 0.702           | 50                        | 1.99 s  | $3,035            |
-| Random Forest    | 8   | 0.865 | 0.794     | 0.950  | 0.912           | 278                       | 3 ms    | local             |
-| Random Forest    | all | 0.765 | 0.971     | 0.631  | 0.263           | —                         | 3 ms    | local             |
-| Isolation Forest | all | 0.761 | 0.974     | 0.624  | 0.573           | —                         | 3 ms    | local             |
+| Jev              | 1   | 0.856 | 0.953     | 0.778  | 0.747           | 43                        | 0.31 s  | $74               |
+| Gemini 3.6 Flash | 1   | 0.880 | 0.942     | 0.826  | 0.713           | 57                        | 1.65 s  | $1,651            |
+| Random Forest    | 1   | 0.748 | 0.598     | 1.000  | 1.000           | 764                       | 2.6 ms  | local             |
+| Jev              | 8   | 0.854 | 0.942     | 0.783  | 0.721           | 56                        | 0.32 s  | $295              |
+| Gemini 3.6 Flash | 8   | 0.881 | 0.949     | 0.823  | 0.702           | 50                        | 1.38 s  | $3,035            |
+| Random Forest    | 8   | 0.865 | 0.794     | 0.950  | 0.912           | 278                       | 2.5 ms  | local             |
+| Random Forest    | all | 0.765 | 0.971     | 0.631  | 0.263           | —                         | 2.6 ms  | local             |
+| Isolation Forest | all | 0.761 | 0.974     | 0.624  | 0.573           | —                         | 2.7 ms  | local             |
 
-Jev against Gemini over all 6,000 paired verdicts at k = 1: 508 differ, Jev is right in 195 and Gemini in 313 (McNemar p < 0.001); Gemini leads at every k. On the 900 zero-day attacks at k = 1: 118 differ, Jev is right in 74 and Gemini in 44 (p = 0.007); Jev also leads at k = 2, and the two are indistinguishable at k = 4 and 8. Jev against the Random Forest over all flows at k = 1: 2,909 differ, Jev is right in 2,161 (p < 0.001); the forest overtakes Jev only at k = 8 (0.865 against 0.854, p = 0.007). A forest trained on five rows calls almost everything an attack, which is why its recall is perfect and its precision is not.
+Latency is the median of the successful requests for Jev and Gemini and the mean per flow for the forests, which run locally on a MacBook Air (Apple M3, 16 GB). Flow by flow across the three seeds, 111 flows favor Jev and 208 favor Gemini at k = 1 (sign test, Holm-adjusted p < 0.001), and Gemini leads at every k. On the 300 zero-day attacks, 53 flows favor Jev and 26 Gemini at k = 1 (adjusted p = 0.013) and 77 against 37 at k = 2 (adjusted p = 0.001). At k = 0, 4 and 8 the difference is not significant, and at k = 1 one of the three seeds favors Gemini. Jev against the Random Forest at k = 1: 848 flows favor Jev and 351 the forest (p < 0.001). The forest overtakes Jev on F1 only at k = 8 (0.865 against 0.854), yet 360 flows still favor Jev and 289 the forest (p = 0.006), because the two err in opposite directions. A forest trained on five rows calls almost everything an attack, which is why its recall is perfect and its precision is not.
 
 <img src="docs/results-f1-three-sets.svg" alt="F1 by k for three attack sets, all with the normal flows: all attacks, known-type attacks and zero-day attacks; Gemini leads the first two, Jev leads zero-day from k = 1, the Random Forest is last on zero-day" width="100%" />
 
-The multipliers at the top come from the k = 1 rows: 2,421 ms against 315 ms per flow, $1,651 against $74 per million flows, precision 0.942 against 0.953, and 764 against 43 false alarms on the same 874 benign flows.
+The multipliers at the top come from the k = 1 rows: a median of 1,647 ms against 307 ms per flow, $1,651 against $74 per million flows, precision 0.942 against 0.953, and 764 against 43 false alarms on the same 874 benign flows.
 
 Limits worth knowing:
 
 - Gemini's cost is the list price through 2026-12-31 ($0.75 input, $3.75 output per million tokens); it doubles on 2027-01-01. Jev's is TypeSafe's list price. Neither is what was billed.
 - Gemini's latency was measured with five processes in parallel on a congested day (transient 429, 500 and 504 answers, all repaired with `redo-errors`), so it is a real-day figure, not a floor. Jev's latency is the wall clock around one direct call to TypeSafe's API.
-- Gemini 3.x cannot switch thinking off; it ran at `thinking_level="low"`, about 200 reasoning tokens per flow, billed as output.
+- Gemini 3.x cannot switch thinking off. It ran at `thinking_level="low"` and at k = 1 used reasoning tokens in 57% of the requests, about 210 each, billed as output.
 - NF-UQ-NIDS-v2 has a card and a preparation script and no run yet. Every number here is NSL-KDD's.
 - Jev's `noul` answer carries no confidence. Only the `choice` answer does.
 
@@ -149,7 +149,7 @@ Half a second per verdict and a rate-limited API make this an asynchronous side 
 2. **Describe your flows.** Write a dataset card like [`data/nsl-kdd/dataset.json`](data/nsl-kdd/dataset.json): the columns your flow exporter emits, in order, which of them are symbolic, your categories and which one is benign.
 3. **Write the request.** Copy [`prompts/nsl-kdd/jev.json`](prompts/nsl-kdd/jev.json), replace `columns` and the category descriptions with yours, and keep the two questions.
 4. **Pick examples.** One labeled flow per category from your own network is enough to start; k = 1 is where the benchmark's F1 reaches its plateau.
-5. **Call the detector.** `JevDetector(load_prompt(path)).predict(flow, examples)` returns `p_attack`, `category_pred` and `confidence` for one flow in about half a second. Route `p_attack` to your alerting with the cut your alarm budget allows; 0.5 was the benchmark's choice, not a rule.
+5. **Call the detector.** `JevDetector(load_prompt(path)).predict(flow, examples)` returns `p_attack`, `category_pred` and `confidence` for one flow in about a third of a second. Route `p_attack` to your alerting with the cut your alarm budget allows; 0.5 was the benchmark's choice, not a rule.
 6. **Measure before you trust.** Run `jev-ids run` and `jev-ids metrics` on a labeled split of your own flows. The numbers above are NSL-KDD's, not yours.
 
 Only flow features leave your network, never payloads, but they do leave it: every request goes to TypeSafe's API.
