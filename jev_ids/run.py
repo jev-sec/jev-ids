@@ -140,7 +140,7 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
     run_dir = spec.results_dir / run_id
     # The commit the code was at, with `-dirty` when the working tree had uncommitted changes, so a run can be traced to its exact code;
     # the split file is hashed for the same reason, because the card's hash does not cover the Flows that were judged.
-    commit = ["git", "describe", "--always", "--dirty", "--abbrev=40"]
+    commit = ["git", "describe", "--always", "--dirty", "--abbrev=40", "--exclude=*"]
     described = subprocess.run(commit, capture_output=True, text=True, cwd=ROOT, check=False)  # noqa: S603 constant arguments
     split_path = config["dir"] / "splits" / f"{spec.split}.csv"
     write_config(
