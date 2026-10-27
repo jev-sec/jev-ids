@@ -93,8 +93,20 @@ def test_scores_break_recall_down_by_category_and_rank_p_attack_without_the_cut(
     rows[0]["p_attack"] = None
     assert metrics.scores(rows)["roc_auc"] == pytest.approx(3 / 6)
     # The keys of one cell come in a fixed order, categories sorted, so the summary columns are stable.
-    assert list(scores)[:5] == ["f1", "precision", "recall", "recall_novel", "recall_known"]
-    assert list(scores)[5:] == [
+    assert list(scores)[:7] == [
+        "f1",
+        "precision",
+        "recall",
+        "recall_novel",
+        "recall_known",
+        "recall_novel_first_contact",
+        "recall_novel_after_feedback",
+    ]
+    # Rows that are not from a stream carry no `first_contact`.
+    assert (scores["recall_novel_first_contact"], scores["recall_novel_after_feedback"]) == (None, None)
+    rows[0]["first_contact"], rows[0]["p_attack"] = True, 0.9
+    assert metrics.scores(rows)["recall_novel_first_contact"] == 1.0
+    assert list(scores)[7:] == [
         "recall_dos",
         "recall_known_dos",
         "recall_novel_dos",
@@ -162,7 +174,7 @@ def test_summarize_has_one_row_per_group_averaged_over_cells() -> None:
         prediction["model"] = "jev-1.13.0"
     zero_shot, one_shot = metrics.summarize(predictions)
     assert (zero_shot["k"], one_shot["k"]) == (0, 1)
-    assert list(one_shot)[:5] == ["dataset", "detector", "model", "split", "k"]
+    assert list(one_shot)[:6] == ["dataset", "detector", "model", "split", "delay", "k"]
     assert one_shot["dataset"] == "test"
     assert (one_shot["cells"], one_shot["flows"], one_shot["predictions"]) == (2, 2, 4)
     # The seed 0 cell has F1 = 1 and the seed 1 cell F1 = 0.

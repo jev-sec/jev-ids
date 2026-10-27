@@ -11,8 +11,9 @@ value changed after a result has been seen is logged in [Changes after results](
 | NF-UQ-NIDS-v2 removed                   | Done, commit `1197267`                                                  |
 | Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, replaced in stage 0 |
 | Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0        |
-| Stage 0                                 | Done; stops for review before line 0                                    |
-| Stages 1 to 6 below                     | Not started                                                             |
+| Stage 0                                 | Done, commit `3b011d8`                                                  |
+| Stage 1                                 | Stream and memory implemented (`jev_ids/stream.py`); line 0 running     |
+| Stages 2 to 6 below                     | Not started                                                             |
 
 ## Goal
 
@@ -183,6 +184,8 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 ## Evaluation rules
 
 - Lines 0 to 4 run on the `pilot` split. The values above are fixed now; any change made after a pilot result is logged below.
+- Lines 0 to 4 use D = 1, fixed before any stream result: the lines measure the components, and D is varied in stage 6 only. On the
+  300-Flow pilot, D = 100 or 500 would hold back a third or more of the stream, so the components would hardly get feedback.
 - The validation stream from the pool is used for the threshold only. It holds no novel attacks, because novel attack names never
   enter the pool, so it cannot measure what matters most.
 - The `paper` split is read once, in stage 6.
@@ -200,8 +203,8 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
   label, difficulty 0.5 and no Jev answer, and the `KController` ignores it. To confirm in stage 1.
 - Each Example costs about 490 input tokens on CIC-IDS2017 before rounding: (25,312 − 1,654) / 48, from the pilot's mean input tokens at
   k = 8 and k = 0.
-- In stage 1, seeds drive the random Examples. From stage 3 on the `Selector` is deterministic, so seeds only vary the RF and repetitions
-  measure Jev's own variation.
+- In stage 1, seeds drive the random Examples. From stage 3 on the `Selector` is deterministic, and so are the forests (random_state 0,
+  the same for every seed), so repetitions measure Jev's own variation alone.
 - With the memory tied to the clock, Infiltration - Portscan (Thursday) is judged with no PortScan Example, because the pool's Portscan
   Flows are on Friday. That is a genuine novel attack, not a bug.
 - Before stage 3 runs, check that the score and the redundancy terms behave as intended on a handful of real Flows; a scale mismatch

@@ -58,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     runner.add_argument("--reps", type=int, default=1, help="repetitions of each (k, seed) cell")
     runner.add_argument("--model", help="provider model id, for the LLM detectors")
     runner.add_argument("--results-dir", type=Path, default=run.RESULTS_DIR, help="where the run directory is created")
+    runner.add_argument("--delay", type=int, help="stream the split with this feedback delay D, in Flows (docs/jevids-design.md, D4)")
     runner.set_defaults(handler=run_command)
 
     redoer = commands.add_parser("redo-errors", help="complete a run in place: its error rows again, its missing flows for the first time")
@@ -99,6 +100,7 @@ def run_command(args: argparse.Namespace) -> None:
         reps=args.reps,
         model_id=args.model,
         results_dir=args.results_dir,
+        delay=args.delay,
     )
     run.run_from_spec(spec)
 

@@ -104,6 +104,9 @@ def scores(rows: Sequence[Prediction]) -> dict[str, float | None]:
         "recall": rate(attacks),
         "recall_novel": rate(only_subset(rows, "novel")),
         "recall_known": rate(only_subset(rows, "known")),
+        # Stream runs only: a novel attack judged before any Flow of its attack name came back, and one judged after.
+        "recall_novel_first_contact": rate([p for p in rows if p.get("first_contact") is True]),
+        "recall_novel_after_feedback": rate([p for p in rows if p.get("first_contact") is False]),
         **recall_by_category(attacks),
         "false_alarms": alerts - hits,
         "missed_attacks": len(attacks) - hits,
@@ -193,9 +196,9 @@ def none_last_key(values: Sequence[Any]) -> tuple[Any, ...]:
 
 
 def summarize(predictions: Iterable[Prediction]) -> list[dict[str, Any]]:
-    """One row per (dataset, detector, model, split, k), k = all last."""
+    """One row per (dataset, detector, model, split, delay, k), k = all last; delay is None for a run that is not a stream."""
     prices: dict[str, Any] = json.loads(PRICES_PATH.read_text("utf-8"))["models"]
-    fields = ("dataset", "detector", "model", "split", "k")
+    fields = ("dataset", "detector", "model", "split", "delay", "k")
     groups = group_by_fields(predictions, fields)
     return [{**dict(zip(fields, key, strict=True)), **summary(groups[key], prices)} for key in sorted(groups, key=none_last_key)]
 

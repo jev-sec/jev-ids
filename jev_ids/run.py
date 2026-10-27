@@ -6,7 +6,8 @@ In reading order:
 - `load_prompt`: any prompt file as text plus its sha256; Jev and the LLMs load their files (`jev.json`, `llm.md`) through it alike.
 - `build_detector` and `check_spec`: the Detector named in the spec, and the two combinations of Detector and k that would only waste calls.
 - `sample_examples`: k Examples per Category, seeded and nested across k.
-- `execute` and `judge`: the loop itself, cell by cell and Flow by Flow, and the three files of the run.
+- `execute` and `judge`: the loop itself, cell by cell and Flow by Flow, and the three files of the run; with a delay D, each cell is a
+  stream instead (`jev_ids/stream.py`).
 - `run_from_spec`: the CLI entry that strings the above together.
 - `redo_errors`: the other CLI entry, completing a run: its error rows are judged again and its missing Flows for the first time.
 
@@ -34,6 +35,7 @@ from jev_ids.detectors.jev import JevDetector
 from jev_ids.detectors.llm import LLMDetector
 from jev_ids.detectors.random_forest import RandomForestDetector
 from jev_ids.records import append_prediction, complete_prediction, read_predictions, write_config
+from jev_ids.stream import Memory, split_names, stream_cell
 
 RESULTS_DIR = ROOT / "results"
 
@@ -54,6 +56,8 @@ class RunSpec:
         reps: how often each (k, seed) cell is repeated, for stability.
         model_id: the provider model, for the LLM detectors; None means default.
         results_dir: where run directories are created.
+        delay: the feedback delay D in steps for a stream run (docs/jevids-design.md, D4); None judges every Flow against one fixed draw
+            of Examples, the protocol of the first paper.
     """
 
     detector: str
@@ -64,6 +68,7 @@ class RunSpec:
     reps: int = 1
     model_id: str | None = None
     results_dir: Path = RESULTS_DIR
+    delay: int | None = None
 
 
 def load_prompt(path: Path) -> dict[str, Any]:
@@ -166,6 +171,16 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
         "split": spec.split,
         "prompt_hash": detector.prompt_hash,
     }
+    if spec.delay is not None:
+        split_path = config["dir"] / "splits" / f"{spec.split}.csv"
+        names = split_names(split_path)
+        for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
+            # A fresh memory per cell: what one cell learned must not leak into the next.
+            memory = Memory(train, config["categories"], spec.delay, names)
+            cell = {**run_fields, "k": k, "seed": seed, "repetition": repetition, "delay": spec.delay}
+            stream_cell(run_dir, detector, memory, flows, cell)
+        print(f"done: {run_dir}")
+        return run_dir
     for k, seed in itertools.product(spec.k_values, spec.seeds):
         # Drawn once per (k, seed) and reused by every rep, so the Random Forest keeps its fit across the repetitions. k = None is
         # the whole pool.
@@ -212,6 +227,9 @@ def redo_errors(run_dir: Path) -> Path:
     """
     stored = json.loads((run_dir / "config.json").read_text("utf-8"))
     fields: dict[str, Any] = stored["spec"]
+    if fields.get("delay") is not None:
+        # The memory of a stream depends on every earlier row, so a Flow judged again would see another past than its neighbours did.
+        raise ValueError(f"{run_dir.name} is a stream run: judge it again from the start instead")
     spec = RunSpec(
         detector=fields["detector"],
         dataset=Path(fields["dataset"]),
