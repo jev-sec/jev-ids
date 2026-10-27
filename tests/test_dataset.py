@@ -46,7 +46,7 @@ def test_load_split_rejects_unknown_categories_and_missing_features(
         dataset.load_split(path, config)
 
 
-@pytest.mark.parametrize(("name", "categories"), [("nsl-kdd", 5), ("nf-uq-nids-v2", 21)])
+@pytest.mark.parametrize(("name", "categories"), [("nsl-kdd", 5)])
 def test_each_committed_card_is_consistent(name: str, categories: int) -> None:
     config = dataset.load_config(ROOT / "data" / name / "dataset.json")
     assert config["name"] == name
@@ -62,11 +62,3 @@ def test_the_nsl_kdd_card_maps_every_attack_name() -> None:
     attack_categories = set(config["categories"]) - {config["benign"]}
     assert set(config["attack_names"]) == attack_categories
     assert sum(len(names) for names in config["attack_names"].values()) == 39
-
-
-def test_the_nf_uq_nids_v2_card_drops_the_addresses() -> None:
-    config = dataset.load_config(ROOT / "data" / "nf-uq-nids-v2" / "dataset.json")
-    assert "IPV4_SRC_ADDR" not in config["features"]
-    assert "IPV4_DST_ADDR" not in config["features"]
-    assert config["symbolic"] == ["PROTOCOL", "L7_PROTO"]
-    assert config["categories"][0] == config["benign"] == "Benign"

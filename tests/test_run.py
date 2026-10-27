@@ -250,7 +250,7 @@ def test_load_prompt_hashes_the_bytes(tmp_path: Path) -> None:
     assert run.load_prompt(path) == {"text": "abc", "sha256": sha256}
 
 
-@pytest.mark.parametrize("name", ["nsl-kdd", "nf-uq-nids-v2"])
+@pytest.mark.parametrize("name", ["nsl-kdd"])
 def test_each_committed_prompt_pair_matches_its_card(name: str) -> None:
     config = dataset.load_config(ROOT / "data" / name / "dataset.json")
     body = json.loads(run.load_prompt(ROOT / "prompts" / name / "jev.json")["text"])

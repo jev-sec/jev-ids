@@ -117,7 +117,6 @@ Limits worth knowing:
 - Gemini's cost is the list price through 2026-12-31 ($0.75 input, $3.75 output per million tokens); it doubles on 2027-01-01. Jev's is TypeSafe's list price. Neither is what was billed.
 - Gemini's latency was measured with five processes in parallel on a congested day (transient 429, 500 and 504 answers, all repaired with `redo-errors`), so it is a real-day figure, not a floor. Jev's latency is the wall clock around one direct call to TypeSafe's API.
 - Gemini 3.x cannot switch thinking off. It ran at `thinking_level="low"` and at k = 1 used reasoning tokens in 57% of the requests, about 210 each, billed as output.
-- NF-UQ-NIDS-v2 has a card and a preparation script and no run yet. Every number here is NSL-KDD's.
 - Jev's `noul` answer carries no confidence. Only the `choice` answer does.
 
 ## Development

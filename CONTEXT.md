@@ -2,16 +2,15 @@
 
 Intrusion detection on network flow records with a System One Model (Jev),
 compared with an LLM baseline, a Random Forest and an Isolation Forest on data
-efficiency, cost and latency. NSL-KDD is the first Dataset and NF-UQ-NIDS-v2
-the second.
+efficiency, cost and latency. NSL-KDD is the Dataset.
 
 ## Language
 
 ### Data
 
 **Dataset**:
-A source of Flows prepared once into a Card, a Pool and Splits: NSL-KDD or
-NF-UQ-NIDS-v2. Every Run names one.
+A source of Flows prepared once into a Card, a Pool and Splits: NSL-KDD. Every
+Run names one.
 _Avoid_: corpus, benchmark, source.
 
 **Card**:
@@ -38,7 +37,7 @@ _Avoid_: training set, train, corpus.
 **Novel attack**:
 An attack Flow whose kind is absent from the Pool. In NSL-KDD, a Flow whose
 attack name occurs in KDDTest+ but never in KDDTrain+; seventeen such names
-exist. In NF-UQ-NIDS-v2, a Flow of a Category held out of the Pool.
+exist.
 _Avoid_: unseen attack, zero-day, new attack.
 
 **Example**:
