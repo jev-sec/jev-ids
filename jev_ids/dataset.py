@@ -10,8 +10,8 @@ In reading order:
 A dataset lives in `data/<name>/`: `dataset.json` (the card), `pool.csv` (the Flows that Examples are drawn from) and `splits/<split>.csv`
 (the Flows a run judges). The card names the dataset, lists its `features` in column order, the `symbolic` ones among them, the `categories`
 every Detector works with and which category is `benign`. Every CSV has `row_id`, one column per feature, `category` and `novel_attack`
-(0/1); extra columns are ignored. Nothing here knows a dataset by name: `scripts/prepare_<name>.py` converts the raw download into this
-shape, once, outside the package.
+(0/1); a dataset with timestamps also has `end`, when the Flow ended, which orders the stream; extra columns are ignored. Nothing here knows
+a dataset by name: `scripts/prepare_<name>.py` converts the raw download into this shape, once, outside the package.
 
 Vocabulary follows CONTEXT.md: a Flow is one record of the dataset; an Example is a pool Flow shown to a Detector as reference, a role and
 not a separate type, so Examples are plain Flows here.
@@ -22,6 +22,7 @@ import hashlib
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,7 @@ class Flow:
         category: the Category label; an attack name never gets this far.
         is_attack: whether the category is not the card's benign one.
         novel_attack: whether the attack is absent from the pool (CONTEXT.md).
+        end: when the Flow ended, the moment its record exists; None for a dataset without timestamps, such as NSL-KDD.
     """
 
     row_id: int
@@ -48,6 +50,7 @@ class Flow:
     category: str
     is_attack: bool
     novel_attack: bool = False
+    end: datetime | None = None
 
     @property
     def attribute_values(self) -> tuple[str, ...]:
@@ -83,6 +86,7 @@ def flow_from_row(row: dict[str, str], config: Config) -> Flow:
         category=category,
         is_attack=category != config["benign"],
         novel_attack=row["novel_attack"] == "1",
+        end=datetime.fromisoformat(row["end"]) if row.get("end") else None,
     )
 
 

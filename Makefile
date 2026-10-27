@@ -28,12 +28,12 @@ check-ts:
 check-dup:
 	@npx jscpd .
 
-# Paper protocol (docs/protocol.md): the four detectors over the `paper` split of NSL-KDD into results/paper/, then the summary;
-# `make paper DATASET=cicids2017` does the same over CIC-IDS2017 into results/paper-cicids2017/, apart from the published runs. Each
-# detector is its own target so they can run in separate terminals; `paper` runs them one after the other. The LLM is the slow one, about
-# 1.7 s per flow, so it is split into one target per k, each its own run directory: `make -j5 paper-llm` runs the five at once;
-# `metrics` and `compare --b` take the five directories together. k stops at 8 since 2026-09-22 (docs/protocol.md).
-DATASET ?= nsl-kdd
+# Paper protocol (docs/protocol.md): the four detectors over the `paper` split of CIC-IDS2017 into results/paper-cicids2017/, then the
+# summary; NSL-KDD is frozen (docs/jevids-design.md, D1), and `make paper DATASET=nsl-kdd` writes into results/paper/, the published
+# runs. Each detector is its own target so they can run in separate terminals; `paper` runs them one after the other. The LLM is the slow
+# one, about 1.7 s per flow, so it is split into one target per k, each its own run directory: `make -j5 paper-llm` runs the five at
+# once; `metrics` and `compare --b` take the five directories together. k stops at 8 since 2026-09-22 (docs/protocol.md).
+DATASET ?= cicids2017
 PAPER_DIR = results/paper$(if $(filter-out nsl-kdd,$(DATASET)),-$(DATASET))
 PAPER_RUN = uv run jev-ids run --dataset data/$(DATASET)/dataset.json --split paper --results-dir $(PAPER_DIR) --seeds 0,1,2
 LLM_KS = 0 1 2 4 8

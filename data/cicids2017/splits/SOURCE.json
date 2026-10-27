@@ -3,13 +3,15 @@
     "smoke": 5,
     "internal": 50,
     "pilot": 300,
-    "paper": 2000
+    "paper": 2000,
+    "validation": 300
   },
   "novel_attack_rows": {
-    "smoke": 1,
-    "internal": 5,
-    "pilot": 44,
-    "paper": 265
+    "smoke": 2,
+    "internal": 7,
+    "pilot": 48,
+    "paper": 300,
+    "validation": 0
   },
   "dataset": "CIC-IDS2017 improved, Liu et al., IEEE CNS 2022",
   "source_files": {
@@ -86,11 +88,13 @@
   "draws": {
     "smoke": {
       "seed": 20261027,
+      "source": "test.csv",
       "disjoint_from": [],
       "drawn_on": "2026-10-27"
     },
     "internal": {
       "seed": 20261027,
+      "source": "test.csv",
       "disjoint_from": [
         "smoke"
       ],
@@ -98,6 +102,7 @@
     },
     "pilot": {
       "seed": 20261027,
+      "source": "test.csv",
       "disjoint_from": [
         "internal",
         "smoke"
@@ -106,8 +111,20 @@
     },
     "paper": {
       "seed": 20261027,
+      "source": "test.csv",
       "disjoint_from": [
         "internal",
+        "pilot",
+        "smoke"
+      ],
+      "drawn_on": "2026-10-27"
+    },
+    "validation": {
+      "seed": 20261027,
+      "source": "pool.csv",
+      "disjoint_from": [
+        "internal",
+        "paper",
         "pilot",
         "smoke"
       ],

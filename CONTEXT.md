@@ -36,7 +36,7 @@ _Avoid_: class, attack type (when the label is meant).
 **Pool**:
 The Flows of a Dataset that Examples are drawn from; KDDTrain+ in NSL-KDD. In
 CIC-IDS2017, a capped, seeded sample of the earlier half in time of each attack
-name's Flows, the later half feeding the Splits.
+name's Flows on each day, the later half feeding the Splits.
 k = all means the whole Pool.
 _Avoid_: training set, train, corpus.
 

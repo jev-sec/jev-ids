@@ -1,4 +1,4 @@
-"""Draw one proportional split from a dataset's test file, disjoint from every split already on disk.
+"""Draw one proportional split from a dataset's test file (or its pool), disjoint from every split already on disk.
 
 Run from the repository root. The `paper` split of NSL-KDD was drawn with:
 
@@ -8,6 +8,9 @@ The rows of `test.csv` are shuffled once with the seed and the first `--size` ro
 uniform sample keeps the file's mix of Categories and of novel attacks, so the split is proportional, and skipping the taken rows keeps it
 disjoint from the splits it leaves in place. A split of the same name is replaced and does not count as taken. Rows are copied verbatim
 from the test file, header included, so the split keeps its trace columns. `SOURCE.json` gets the new size, the novel count and the draw.
+
+`--source pool.csv` draws from the pool instead: the validation stream that tunes a choice without reading the test file
+(docs/jevids-design.md, D9). Its Flows stay in the pool, so a run over it must not offer a Flow as its own Example.
 """
 
 import argparse
@@ -28,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, required=True, help="rows to draw")
     parser.add_argument("--seed", type=int, default=20260920, help="the seed the other NSL-KDD splits were drawn with")
     parser.add_argument("--min-novel", type=int, default=0, help="refuse a draw with fewer novel-attack rows than this")
+    parser.add_argument("--source", default="test.csv", help="the file to draw from, in the dataset folder: test.csv or pool.csv")
     return parser.parse_args()
 
 
@@ -44,7 +48,7 @@ def taken_row_ids(splits_dir: Path, name: str) -> tuple[list[str], set[str]]:
 def main() -> None:
     """Draw the split, write it next to the others and record it in SOURCE.json."""
     args = parse_args()
-    with (args.dataset / "test.csv").open(encoding="utf-8", newline="") as handle:
+    with (args.dataset / args.source).open(encoding="utf-8", newline="") as handle:
         reader = csv.reader(handle)
         header = next(reader)
         rows = list(reader)
@@ -64,6 +68,7 @@ def main() -> None:
     manifest["novel_attack_rows"][args.name] = novel_rows
     manifest.setdefault("draws", {})[args.name] = {
         "seed": args.seed,
+        "source": args.source,
         "disjoint_from": others,
         "drawn_on": datetime.now(UTC).date().isoformat(),
     }

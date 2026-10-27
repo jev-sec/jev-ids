@@ -22,7 +22,7 @@ CARD = {
 # Per day, the labels of its lines in file order; line i of a day has timestamp 2017-07-0d 10:00:i and Flow Duration i.
 DAYS = {
     "monday": ["BENIGN"] * 4,
-    "tuesday": ["FTP-Patator", "BENIGN", "FTP-Patator", "FTP-Patator - Attempted", "FTP-Patator"],
+    "tuesday": ["FTP-Patator", "BENIGN", "FTP-Patator", "FTP-Patator - Attempted", "FTP-Patator", "BENIGN"],
     "wednesday": ["DoS Hulk"] * 6 + ["DoS Slowhttptest"] * 3 + ["Heartbleed", "DoS Hulk - Attempted"],
     "thursday": ["Web Attack - XSS", "BENIGN"],
     "friday": ["BENIGN"],
@@ -54,7 +54,7 @@ def test_prepare_keeps_the_card_labels_and_holds_out_the_novel_ones(tmp_path: Pa
     raw, out = write_raw(tmp_path, DAYS)
     prepare.prepare(raw, out, seed=1, caps=SMALL)
     pool, test = read_rows(out / "pool.csv"), read_rows(out / "test.csv")
-    assert list(pool[0]) == dataset.split_header(CARD, *prepare.EXTRA_COLUMNS)
+    assert list(pool[0]) == dataset.split_header(CARD, "end", *prepare.EXTRA_COLUMNS)
     labels = {row["raw_label"] for row in pool + test}
     assert labels == {"BENIGN", "FTP-Patator", "DoS Hulk", "DoS Slowhttptest"}
     assert {row["raw_label"] for row in pool} == {"BENIGN", "FTP-Patator", "DoS Hulk"}
@@ -64,18 +64,29 @@ def test_prepare_keeps_the_card_labels_and_holds_out_the_novel_ones(tmp_path: Pa
     assert [flow.category for flow in dataset.load_split(out / "test.csv", config)].count("DoS") == 4
 
 
-def test_prepare_puts_the_earlier_half_in_the_pool_and_respects_the_caps(tmp_path: Path) -> None:
+def test_prepare_puts_the_earlier_half_of_each_day_in_the_pool_and_respects_the_caps(tmp_path: Path) -> None:
     raw, out = write_raw(tmp_path, DAYS)
     prepare.prepare(raw, out, seed=1, caps=SMALL)
     pool, test = read_rows(out / "pool.csv"), read_rows(out / "test.csv")
+    latest_pool: dict[tuple[str, str], str] = {}
+    for row in pool:
+        group = (row["raw_label"], row["day"])
+        latest_pool[group] = max(latest_pool.get(group, ""), row["timestamp"])
+    assert all(row["timestamp"] > latest_pool.get((row["raw_label"], row["day"]), "") for row in test)
     for label in ("BENIGN", "FTP-Patator", "DoS Hulk"):
-        pool_times = [row["timestamp"] for row in pool if row["raw_label"] == label]
-        test_times = [row["timestamp"] for row in test if row["raw_label"] == label]
-        assert max(pool_times) < min(test_times)
-        assert len(pool_times) <= 2
-        assert len(test_times) <= (3 if label == "BENIGN" else 2)
+        assert sum(row["raw_label"] == label for row in pool) <= 2
+        assert sum(row["raw_label"] == label for row in test) <= (3 if label == "BENIGN" else 2)
     # Six DoS Hulk flows: three may become Examples, the cap keeps two.
     assert sum(row["raw_label"] == "DoS Hulk" for row in pool) == 2
+
+
+def test_prepare_judges_benign_flows_on_every_day_they_occur(tmp_path: Path) -> None:
+    raw, out = write_raw(tmp_path, DAYS)
+    prepare.prepare(raw, out, seed=1, caps=(prepare.Caps(9, 9), prepare.Caps(9, 9)))
+    pool, test = read_rows(out / "pool.csv"), read_rows(out / "test.csv")
+    # One cut over all eight BENIGN flows would put Monday's four in the pool and judge none of them.
+    assert {row["day"] for row in pool if row["raw_label"] == "BENIGN"} == {"monday", "tuesday"}
+    assert {row["day"] for row in test if row["raw_label"] == "BENIGN"} == {"monday", "tuesday", "thursday", "friday"}
 
 
 def test_prepare_numbers_flows_across_days_and_keeps_the_trace(tmp_path: Path) -> None:
@@ -87,6 +98,8 @@ def test_prepare_numbers_flows_across_days_and_keeps_the_trace(tmp_path: Path) -
     assert by_id[5]["day"] == "tuesday"
     assert by_id[5]["source_id"] == "2"
     assert by_id[5]["Flow Duration"] == "1"
+    # 10:00:01.5 plus a Flow Duration of 1 microsecond.
+    assert by_id[5]["end"] == "2017-07-04T10:00:01.500001"
     assert "Src IP" not in by_id[5]
     source = json.loads((out / "splits" / "SOURCE.json").read_text(encoding="utf-8"))
     assert source["dropped_rows"] == {

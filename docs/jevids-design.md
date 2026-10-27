@@ -6,12 +6,13 @@ value changed after a result has been seen is logged in [Changes after results](
 
 ## Status
 
-| Item                                    | State                                                                      |
-| --------------------------------------- | -------------------------------------------------------------------------- |
-| NF-UQ-NIDS-v2 removed                   | Done, commit `1197267`                                                     |
-| Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, which stage 0 replaces |
-| Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical once stage 0 redraws the splits         |
-| Stages 0 to 6 below                     | Not started; stage 0 waits for approval and stops for review before line 0 |
+| Item                                    | State                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| NF-UQ-NIDS-v2 removed                   | Done, commit `1197267`                                                  |
+| Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, replaced in stage 0 |
+| Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0        |
+| Stage 0                                 | Done; stops for review before line 0                                    |
+| Stages 1 to 6 below                     | Not started                                                             |
 
 ## Goal
 
@@ -205,27 +206,33 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
   Flows are on Friday. That is a genuine novel attack, not a bug.
 - Before stage 3 runs, check that the score and the redundancy terms behave as intended on a handful of real Flows; a scale mismatch
   between them is the most likely silent error.
+- Stage 0 split sizes and novel counts (seed 20261027): smoke 5 (2 novel), internal 50 (7), pilot 300 (48), paper 2000 (300). The test
+  file holds between 1,815 and 2,402 BENIGN Flows per day.
+- `splits/validation.csv` (300 Flows, no novel attack) is drawn from the pool with `draw_split --source pool.csv`. Its Flows stay in the
+  pool, so a run over it must keep a Flow from being its own Example; the clock rule of D4 already does this, because a Flow only sees
+  pool Flows that ended before it.
 - Run every command through make or with `UV_PROJECT_ENVIRONMENT=$HOME/.venvs/jev-ids`, so `uv run` does not create `.venv` in the repo.
 
 ## Data facts behind the decisions
 
-Time span of each attack name in the current files (timestamps as in the zip):
+Time span of each attack name in the files of stage 0 (timestamps as in the zip). Before stage 0, BENIGN was cut once over the week: pool
+07-03 11:56 to 07-05 14:08, test 07-05 14:08 to 07-07 20:02. The attack time spans did not change.
 
-| Attack name                     | Pool                       | Test                       |
-| ------------------------------- | -------------------------- | -------------------------- |
-| BENIGN                          | 07-03 11:56 to 07-05 14:08 | 07-05 14:08 to 07-07 20:02 |
-| FTP-Patator                     | 07-04 12:19 to 12:49       | 07-04 12:49 to 13:20       |
-| SSH-Patator (novel)             | none                       | 07-04 17:09 to 18:11       |
-| DoS Slowloris                   | 07-05 12:48 to 12:59       | 07-05 12:59 to 13:10       |
-| DoS Slowhttptest (novel)        | none                       | 07-05 13:15 to 13:35       |
-| DoS Hulk                        | 07-05 13:43 to 13:52       | 07-05 13:52 to 14:00       |
-| DoS GoldenEye                   | 07-05 14:10 to 14:13       | 07-05 14:13 to 14:19       |
-| Infiltration - Portscan (novel) | none                       | 07-06 17:00 to 18:45       |
-| Botnet                          | 07-07 13:04 to 13:38       | 07-07 13:38 to 14:02       |
-| Portscan                        | 07-07 16:55 to 17:54       | 07-07 17:54 to 18:23       |
-| DDoS                            | 07-07 18:56 to 19:06       | 07-07 19:06 to 19:16       |
+| Attack name                     | Pool                                      | Test                                   |
+| ------------------------------- | ----------------------------------------- | -------------------------------------- |
+| BENIGN, each day                | 11:42 to 12:00 until about 15:18 to 16:34 | the rest of the day, until about 20:00 |
+| FTP-Patator                     | 07-04 12:19 to 12:49                      | 07-04 12:49 to 13:20                   |
+| SSH-Patator (novel)             | none                                      | 07-04 17:09 to 18:11                   |
+| DoS Slowloris                   | 07-05 12:48 to 12:59                      | 07-05 12:59 to 13:10                   |
+| DoS Slowhttptest (novel)        | none                                      | 07-05 13:15 to 13:35                   |
+| DoS Hulk                        | 07-05 13:43 to 13:52                      | 07-05 13:52 to 14:00                   |
+| DoS GoldenEye                   | 07-05 14:10 to 14:13                      | 07-05 14:13 to 14:19                   |
+| Infiltration - Portscan (novel) | none                                      | 07-06 17:00 to 18:45                   |
+| Botnet                          | 07-07 13:04 to 13:38                      | 07-07 13:38 to 14:02                   |
+| Portscan                        | 07-07 16:55 to 17:54                      | 07-07 17:54 to 18:23                   |
+| DDoS                            | 07-07 18:56 to 19:06                      | 07-07 19:06 to 19:16                   |
 
-Pilot results on the current split (300 Flows: 152 benign, 104 known and 44 novel attacks; means over seeds 0 to 2), the reference for
+Pilot results on the split before stage 0 (300 Flows: 152 benign, 104 known and 44 novel attacks; means over seeds 0 to 2), the reference for
 line 0:
 
 | Detector         | k   | F1    | Precision | Recall | Novel recall | False alarms | Cost per 1M Flows |

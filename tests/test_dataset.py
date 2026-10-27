@@ -1,6 +1,7 @@
 """The card, the shared CSV shape and the Flow."""
 
 import hashlib
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,10 @@ def test_load_split_round_trips_flows_in_card_order(tmp_path: Path) -> None:
     (flow,) = dataset.load_split(path, config)
     assert flow == dataset.Flow(4, "x,y,z", "probe", is_attack=True, novel_attack=True)
     assert flow.attribute_values == ("x", "y", "z")
+    # A dataset with timestamps adds `end`, when the Flow ended.
+    dataset.write_split(path, [*SHARED_HEADER, "end"], [[5, "x", "y", "z", "normal", "0", "2017-07-04T10:00:01.500001"]])
+    (flow,) = dataset.load_split(path, config)
+    assert flow.end == datetime(2017, 7, 4, 10, 0, 1, 500001)
 
 
 def test_load_split_rejects_unknown_categories_and_missing_features(

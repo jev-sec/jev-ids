@@ -55,7 +55,7 @@ uv run python -m scripts.prepare_cicids2017
 uv run jev-ids run --dataset data/cicids2017/dataset.json --detector jev --split smoke --k 0,1
 ```
 
-The script drops the "Attempted" flows and the attacks with too few flows to measure (web attacks, Infiltration, Heartbleed), splits each attack's flows in time between the pool and the test file, and holds three attack names out of the pool as zero-day attacks; its docstring gives every decision and [`SOURCE.json`](data/cicids2017/splits/SOURCE.json) the counts.
+The script drops the "Attempted" flows and the attacks with too few flows to measure (web attacks, Infiltration, Heartbleed), splits each attack's flows of each day in time between the pool and the test file, and holds three attack names out of the pool as zero-day attacks; its docstring gives every decision and [`SOURCE.json`](data/cicids2017/splits/SOURCE.json) the counts.
 
 The smoke split is five flows. The run writes `results/<timestamp>-nsl-kdd-jev-smoke/` with `config.json`, one JSON row per flow in `predictions.jsonl` (the verdict, the truth, p_attack, the category, the confidence, the latency and the gateway's token report) and the raw answers in `responses.jsonl`.
 
