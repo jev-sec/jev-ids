@@ -5,7 +5,7 @@ In reading order:
 - `Flow`: one record of a dataset, as its CSV row has it.
 - `load_config`: the card `dataset.json` as a dict, hashed.
 - `flow_from_row` and `load_split`: a CSV in the shared shape as Flows.
-- `split_header` and `write_split`: the same shape, written by the preparation scripts.
+- `category_by_name`, `split_header` and `write_split`: the card's label table and the same shape, for the preparation scripts.
 
 A dataset lives in `data/<name>/`: `dataset.json` (the card), `pool.csv` (the Flows that Examples are drawn from) and `splits/<split>.csv`
 (the Flows a run judges). The card names the dataset, lists its `features` in column order, the `symbolic` ones among them, the `categories`
@@ -92,10 +92,19 @@ def load_split(path: Path, config: Config) -> list[Flow]:
         return [flow_from_row(row, config) for row in csv.DictReader(handle)]
 
 
+def category_by_name(config: Config) -> dict[str, str]:
+    """Attack name -> category from the card's `attack_names`; the benign label maps to itself."""
+    categories = {config["benign"]: config["benign"]}
+    for category, names in config["attack_names"].items():
+        for name in names:
+            categories[name] = category
+    return categories
+
+
 def split_header(config: Config, *extra: str) -> list[str]:
     """The column names every split and pool file starts with, plus any trace column.
 
-    The three writers of this shape (the two preparation scripts and the test builder) differ only in the trace columns they append, so the
+    The writers of this shape (the preparation scripts and the test builder) differ only in the trace columns they append, so the
     shared part is named here, beside the docstring that defines it.
     """
     return ["row_id", *config["features"], "category", "novel_attack", *extra]

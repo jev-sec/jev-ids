@@ -15,21 +15,12 @@ difficulty. The card's `attack_names` gives each name its category: the 22 train
 import argparse
 from pathlib import Path
 
-from jev_ids.dataset import Config, load_config, split_header, write_split
+from jev_ids.dataset import Config, category_by_name, load_config, split_header, write_split
 
 TRAIN_FILE = "KDDTrain+.txt"
 TEST_FILE = "KDDTest+.txt"
 # Kept after the shared columns so a row can be traced back to its raw line.
 EXTRA_COLUMNS = ("attack_name", "difficulty")
-
-
-def category_by_name(config: Config) -> dict[str, str]:
-    """Attack name -> category from the card; the benign label maps to itself."""
-    categories = {config["benign"]: config["benign"]}
-    for category, names in config["attack_names"].items():
-        for name in names:
-            categories[name] = category
-    return categories
 
 
 def read_lines(path: Path, width: int) -> list[list[str]]:

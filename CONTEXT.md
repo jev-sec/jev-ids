@@ -2,14 +2,16 @@
 
 Intrusion detection on network flow records with a System One Model (Jev),
 compared with an LLM baseline, a Random Forest and an Isolation Forest on data
-efficiency, cost and latency. NSL-KDD is the Dataset.
+efficiency, cost and latency. NSL-KDD is the first Dataset and CIC-IDS2017 the
+second.
 
 ## Language
 
 ### Data
 
 **Dataset**:
-A source of Flows prepared once into a Card, a Pool and Splits: NSL-KDD. Every
+A source of Flows prepared once into a Card, a Pool and Splits: NSL-KDD or
+CIC-IDS2017, in the relabelled version of Liu et al. (IEEE CNS 2022). Every
 Run names one.
 _Avoid_: corpus, benchmark, source.
 
@@ -20,24 +22,30 @@ _Avoid_: config, schema, manifest, metadata.
 
 **Flow**:
 One record of a Dataset: its features and its Category. In NSL-KDD, one
-connection record with 41 attributes.
+connection record with 41 attributes; in CIC-IDS2017, one bidirectional flow
+exported by CICFlowMeter, with 83 attributes.
 _Avoid_: row, line, record, connection.
 
 **Category**:
 The label every Detector works with, one per Flow, listed in the Card; one of
-them is benign. NSL-KDD has `normal`, `dos`, `probe`, `r2l`, `u2r`. Attack
-names such as `neptune` are never shown to a Detector.
+them is benign. NSL-KDD has `normal`, `dos`, `probe`, `r2l`, `u2r`; CIC-IDS2017
+has `BENIGN`, `DoS`, `DDoS`, `PortScan`, `BruteForce`, `Botnet`. Attack names
+such as `neptune` or `DoS Hulk` are never shown to a Detector.
 _Avoid_: class, attack type (when the label is meant).
 
 **Pool**:
-The Flows of a Dataset that Examples are drawn from; KDDTrain+ in NSL-KDD.
+The Flows of a Dataset that Examples are drawn from; KDDTrain+ in NSL-KDD. In
+CIC-IDS2017, a capped, seeded sample of the earlier half in time of each attack
+name's Flows, the later half feeding the Splits.
 k = all means the whole Pool.
 _Avoid_: training set, train, corpus.
 
 **Novel attack**:
 An attack Flow whose kind is absent from the Pool. In NSL-KDD, a Flow whose
 attack name occurs in KDDTest+ but never in KDDTrain+; seventeen such names
-exist.
+exist. In CIC-IDS2017, a Flow of one of three attack names held out of the Pool
+while their Category keeps another: `DoS Slowhttptest`, `SSH-Patator` and
+`Infiltration - Portscan`.
 _Avoid_: unseen attack, zero-day, new attack.
 
 **Example**:
@@ -55,7 +63,8 @@ judges. In NSL-KDD, `internal` is for tuning, `paper` for reported results and
 `smoke` for exercising the pipeline; these three are proportional, and `pilot`
 is a further proportional sample used to rehearse the protocol and take design
 decisions. `hard` and `mid` are diagnostic samples, half attacks and half
-normals, of Flows inside a band of Difficulty. Splits are disjoint.
+normals, of Flows inside a band of Difficulty. CIC-IDS2017 has `smoke`,
+`internal`, `pilot` and `paper`, all proportional. Splits are disjoint.
 
 **Difficulty**:
 NSL-KDD's per-record count of classic learners, out of 21, that classified the

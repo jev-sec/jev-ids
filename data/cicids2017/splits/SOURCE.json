@@ -1,0 +1,117 @@
+{
+  "sizes": {
+    "smoke": 5,
+    "internal": 50,
+    "pilot": 300,
+    "paper": 2000
+  },
+  "novel_attack_rows": {
+    "smoke": 1,
+    "internal": 5,
+    "pilot": 44,
+    "paper": 265
+  },
+  "dataset": "CIC-IDS2017 improved, Liu et al., IEEE CNS 2022",
+  "source_files": {
+    "CICIDS2017_improved.zip": "97fdb91d339e2d8cf5627f981b831e5e7e400b981c58181c451a38fd03c48883"
+  },
+  "seed": 20261027,
+  "caps": {
+    "pool": {
+      "benign": 50000,
+      "attack": 10000
+    },
+    "test": {
+      "benign": 10000,
+      "attack": 1000
+    }
+  },
+  "novel_labels": [
+    "DoS Slowhttptest",
+    "Infiltration - Portscan",
+    "SSH-Patator"
+  ],
+  "dropped_labels": [
+    "Heartbleed",
+    "Infiltration",
+    "Web Attack - Brute Force",
+    "Web Attack - SQL Injection",
+    "Web Attack - XSS",
+    "* - Attempted"
+  ],
+  "dropped_rows": {
+    "Botnet - Attempted": 4067,
+    "DoS GoldenEye - Attempted": 80,
+    "DoS Hulk - Attempted": 581,
+    "DoS Slowhttptest - Attempted": 3368,
+    "DoS Slowloris - Attempted": 1847,
+    "FTP-Patator - Attempted": 12,
+    "Heartbleed": 11,
+    "Infiltration": 36,
+    "Infiltration - Attempted": 45,
+    "SSH-Patator - Attempted": 27,
+    "Web Attack - Brute Force": 73,
+    "Web Attack - Brute Force - Attempted": 1292,
+    "Web Attack - SQL Injection": 13,
+    "Web Attack - SQL Injection - Attempted": 5,
+    "Web Attack - XSS": 18,
+    "Web Attack - XSS - Attempted": 655
+  },
+  "rows_by_label": {
+    "pool": {
+      "BENIGN": 50000,
+      "Botnet": 368,
+      "DDoS": 10000,
+      "DoS GoldenEye": 3783,
+      "DoS Hulk": 10000,
+      "DoS Slowloris": 1929,
+      "FTP-Patator": 1986,
+      "Portscan": 10000
+    },
+    "test": {
+      "BENIGN": 10000,
+      "Botnet": 368,
+      "DDoS": 1000,
+      "DoS GoldenEye": 1000,
+      "DoS Hulk": 1000,
+      "DoS Slowhttptest": 1000,
+      "DoS Slowloris": 1000,
+      "FTP-Patator": 1000,
+      "Infiltration - Portscan": 1000,
+      "Portscan": 1000,
+      "SSH-Patator": 1000
+    }
+  },
+  "prepared_on": "2026-10-27",
+  "draws": {
+    "smoke": {
+      "seed": 20261027,
+      "disjoint_from": [],
+      "drawn_on": "2026-10-27"
+    },
+    "internal": {
+      "seed": 20261027,
+      "disjoint_from": [
+        "smoke"
+      ],
+      "drawn_on": "2026-10-27"
+    },
+    "pilot": {
+      "seed": 20261027,
+      "disjoint_from": [
+        "internal",
+        "smoke"
+      ],
+      "drawn_on": "2026-10-27"
+    },
+    "paper": {
+      "seed": 20261027,
+      "disjoint_from": [
+        "internal",
+        "pilot",
+        "smoke"
+      ],
+      "drawn_on": "2026-10-27"
+    }
+  }
+}

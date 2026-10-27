@@ -48,6 +48,15 @@ uv run python -m scripts.prepare_nsl_kdd
 uv run jev-ids run --dataset data/nsl-kdd/dataset.json --detector jev --split smoke --k 0,1
 ```
 
+For CIC-IDS2017, download `CICIDS2017_improved.zip` from the [relabelled version of Liu et al.](https://intrusion-detection.distrinet-research.be/CNS2022/Dataset_Download.html) into `data/raw/cicids2017/`. The committed splits need only the pool:
+
+```bash
+uv run python -m scripts.prepare_cicids2017
+uv run jev-ids run --dataset data/cicids2017/dataset.json --detector jev --split smoke --k 0,1
+```
+
+The script drops the "Attempted" flows and the attacks with too few flows to measure (web attacks, Infiltration, Heartbleed), splits each attack's flows in time between the pool and the test file, and holds three attack names out of the pool as zero-day attacks; its docstring gives every decision and [`SOURCE.json`](data/cicids2017/splits/SOURCE.json) the counts.
+
 The smoke split is five flows. The run writes `results/<timestamp>-nsl-kdd-jev-smoke/` with `config.json`, one JSON row per flow in `predictions.jsonl` (the verdict, the truth, p_attack, the category, the confidence, the latency and the gateway's token report) and the raw answers in `responses.jsonl`.
 
 ## Compare detectors
@@ -90,6 +99,7 @@ k is the number of labeled examples per category. k = 1 with five categories mea
 | [detectors/random_forest.py](jev_ids/detectors/random_forest.py)       | The classical baseline                                                     |
 | [detectors/isolation_forest.py](jev_ids/detectors/isolation_forest.py) | The unsupervised baseline, fitted on benign traffic alone                  |
 | [prompts/nsl-kdd/](prompts/nsl-kdd)                                    | `jev.json`, the whole request template; `llm.md`, the agent's instructions |
+| [scripts/](scripts)                                                    | One `prepare_<dataset>.py` per dataset, and `draw_split.py` for the splits |
 
 ## Evidence and limits
 
@@ -117,6 +127,7 @@ Limits worth knowing:
 - Gemini's cost is the list price through 2026-12-31 ($0.75 input, $3.75 output per million tokens); it doubles on 2027-01-01. Jev's is TypeSafe's list price. Neither is what was billed.
 - Gemini's latency was measured with five processes in parallel on a congested day (transient 429, 500 and 504 answers, all repaired with `redo-errors`), so it is a real-day figure, not a floor. Jev's latency is the wall clock around one direct call to TypeSafe's API.
 - Gemini 3.x cannot switch thinking off. It ran at `thinking_level="low"` and at k = 1 used reasoning tokens in 57% of the requests, about 210 each, billed as output.
+- CIC-IDS2017 is prepared and has no run yet. Every number here is NSL-KDD's.
 - Jev's `noul` answer carries no confidence. Only the `choice` answer does.
 
 ## Development

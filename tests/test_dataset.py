@@ -46,19 +46,18 @@ def test_load_split_rejects_unknown_categories_and_missing_features(
         dataset.load_split(path, config)
 
 
-@pytest.mark.parametrize(("name", "categories"), [("nsl-kdd", 5)])
-def test_each_committed_card_is_consistent(name: str, categories: int) -> None:
+@pytest.mark.parametrize(("name", "features", "categories"), [("nsl-kdd", 41, 5), ("cicids2017", 83, 6)])
+def test_each_committed_card_is_consistent(name: str, features: int, categories: int) -> None:
     config = dataset.load_config(ROOT / "data" / name / "dataset.json")
     assert config["name"] == name
-    assert len(config["features"]) == 41
-    assert len(set(config["features"])) == 41
+    assert len(config["features"]) == features
+    assert len(set(config["features"])) == features
     assert set(config["symbolic"]) <= set(config["features"])
     assert len(config["categories"]) == categories
     assert config["benign"] in config["categories"]
+    assert set(config["attack_names"]) == set(config["categories"]) - {config["benign"]}
 
 
 def test_the_nsl_kdd_card_maps_every_attack_name() -> None:
     config = dataset.load_config(ROOT / "data" / "nsl-kdd" / "dataset.json")
-    attack_categories = set(config["categories"]) - {config["benign"]}
-    assert set(config["attack_names"]) == attack_categories
     assert sum(len(names) for names in config["attack_names"].values()) == 39
