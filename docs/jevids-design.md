@@ -457,3 +457,6 @@ measurable effect of the controller is on the Category, not the Verdict: DDoS Fl
 therefore, the cost cut of line 3 comes from k₀ = 1 and the `Selector`, not from the reaction to errors. The pilot gives the controller
 few errors to react to (no missed attack in either run, 9 novel Flows at first contact), so this does not settle the question for the
 paper split, where 300 novel attacks and D up to 500 test the reaction to errors; it does mean the AIMD cannot be claimed from the pilot.
+
+Decided after this result, on 2026-10-28: the design keeps the mirrored AIMD as fixed in D5, with no change to its error signal, and
+stage 6 adds no fixed k = 1 line. The control above stays reported as it is.
