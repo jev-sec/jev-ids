@@ -195,12 +195,13 @@ dynamic k changes the distribution of p_attack.
 
 ### D10. Baselines see what Jev IDS sees
 
-| Baseline         | How                                                                                                                                                       |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Jev, random k    | Stage 1: Examples drawn at random from the visible memory, k = 4 for every Category                                                                       |
-| Random Forest    | Refitted on the visible memory at every Flow, so it gets the same past and the same feedback as Jev IDS; one seed, since the forest does not depend on it |
-| Isolation Forest | Refitted on the benign Flows of the visible memory at every Flow; one seed                                                                                |
-| kNN              | The same neighbours the `Selector` finds, majority vote; if it matches Jev IDS, Jev adds nothing                                                          |
+| Baseline         | How                                                                                                                                                                                                                                                                                       |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jev, random k    | Stage 1: Examples drawn at random from the visible memory, k = 4 for every Category                                                                                                                                                                                                       |
+| Random Forest    | Refitted on the visible memory at every Flow, so it gets the same past and the same feedback as Jev IDS; one seed, since the forest does not depend on it                                                                                                                                 |
+| Isolation Forest | Refitted on the benign Flows of the visible memory at every Flow; one seed                                                                                                                                                                                                                |
+| kNN              | The same neighbours the `Selector` finds, majority vote; if it matches Jev IDS, Jev adds nothing                                                                                                                                                                                          |
+| Jev, k = 1 fixed | The `Selector` at a fixed k = 1, never reacting to errors; the baseline of the `KController`: if it matches Jev IDS, the reaction to errors adds nothing. Also the cheapest Jev, the left end of the cost against F1 curve. Added on 2026-10-28 after line 3, see "Changes after results" |
 
 A forest fitted once on the whole pool would see later pool Flows (the future) and never the feedback; a reviewer could point at either.
 
@@ -236,7 +237,7 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 | 3. `Selector`    | Score and MMR, k = 4                                                                                                                                                                           | Test: two identical Flows are never chosen together                                                                      | Line 2 and the kNN baseline              |
 | 4. `KController` | Mirrored AIMD                                                                                                                                                                                  | Tests: error, success and absent Category                                                                                | Line 3                                   |
 | 5. Threshold     | Cut tuned on the validation stream                                                                                                                                                             | The test splits are never read                                                                                           | Line 4                                   |
-| 6. Final         | The paper split, once: full system, leave-one-out ablation, D ∈ {1, 100, 500}, statistics                                                                                                      | McNemar and the Holm-adjusted sign test that already exist                                                               | Final table, cost against F1 curve       |
+| 6. Final         | The paper split, once: full system, leave-one-out ablation, the baselines of D10 (Jev at a fixed k = 1 included), D ∈ {1, 100, 500}, statistics                                                | McNemar and the Holm-adjusted sign test that already exist                                                               | Final table, cost against F1 curve       |
 
 ## Evaluation rules
 
@@ -459,4 +460,10 @@ few errors to react to (no missed attack in either run, 9 novel Flows at first c
 paper split, where 300 novel attacks and D up to 500 test the reaction to errors; it does mean the AIMD cannot be claimed from the pilot.
 
 Decided after this result, on 2026-10-28: the design keeps the mirrored AIMD as fixed in D5, with no change to its error signal, and
-stage 6 adds no fixed k = 1 line. The control above stays reported as it is.
+stage 6 adds no fixed k = 1 line. The control above stays reported as it is. (Superseded the same day by the decision below.)
+
+Decided later on 2026-10-28, replacing the line above on stage 6: Jev with the `Selector` at a fixed k = 1 becomes a baseline of D10,
+the baseline of the `KController`, and runs in stage 6 on the paper split for every D ∈ {1, 100, 500}. It isolates the reaction to
+errors, because it differs from the full system in that alone; the leave-one-out ablation without the `KController` (a fixed k = 4)
+measures what the controller saves, this baseline whether its reaction to errors improves detection. The AIMD itself stays as fixed in
+D5.
