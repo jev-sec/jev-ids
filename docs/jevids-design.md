@@ -13,7 +13,8 @@ value changed after a result has been seen is logged in [Changes after results](
 | Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0        |
 | Stage 0                                 | Done, commit `3b011d8`                                                  |
 | Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
-| Stages 2 to 6 below                     | Not started                                                             |
+| Stage 2                                 | Code done, see D7; line 1 below                                         |
+| Stages 3 to 6 below                     | Not started                                                             |
 
 ## Goal
 
@@ -130,6 +131,22 @@ Numbers sent to Jev are written with 4 significant digits, not a fixed number of
 10⁻⁵, so cutting decimals would erase the small values and leave the large ones long. Only the text sent to Jev (and the LLM) changes;
 the forests keep the full values. No column is removed: selective column removal adds decisions a reviewer can question.
 
+Fixed on 2026-10-28, before line 1 was run (`dataset.compact_value`):
+
+- A value written as an integer stays as it is, in every column: rounding `20694308` to `20690000` saves no character, and an exponent
+  would turn a port such as `44321` into `4.432e+04`. No list of exempt columns is needed.
+- Any other number gets 4 significant digits and no exponent: `25160.418777440053` becomes `25160`, `168.86187098953056` becomes `168.9`
+  and `0.0000123456` would become `0.00001235`. No non-zero value below 0.001 occurred in 20,000 pool Flows.
+- `-1` and `0` are integers and stay; a decimal with an integer value loses its `.0` (`0.0` becomes `0`); text that is not a finite number
+  (NSL-KDD's `tcp`, `inf`, `nan`) stays.
+- The prompt hash does not change, so the format is recorded as `record` (`full` or `compact`) in `config.json` (`spec.record`) and in
+  every row, and `jev-ids metrics` groups by it. `jev-ids run --record full|compact` sets it, `compact` by default; rows written before it
+  existed read back as `full`. The forests always write `full`.
+
+Measured before the choice, on 6 pool Flows (one per Category) at k = 0, 24 calls: Jev's `input_tokens` was exactly the number of
+characters of the record plus 1,194 in every call, so a character saved is a token saved. Mean characters per record on the pilot:
+466 in full, 322 with `.4g` everywhere, 311 with `.4g` and integers kept, 296 in the chosen format; on 5,000 pool Flows, 456 and 290.
+
 ### D8. One request per Flow
 
 Judging several Flows per request was dropped to avoid code changes that do not improve the design. An open question would have had to be
@@ -229,7 +246,7 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
   `execute` builds a fresh `Memory` per (k, seed, rep) cell and calls `stream_cell`. `redo-errors` refuses a stream run, because a Flow
   judged again would see another past than its neighbours did: a stream run with errors is run again from the start.
 - `jev_ids/detectors/random_forest.py`: `Encoder` encodes each Flow once for both forests; `jobs` is scikit-learn's `n_jobs`.
-- CLI: `jev-ids run ... --delay D` streams the split; `--jobs N` sets the cores of a forest fit (default -1, all; the forests are the same
+- CLI: `jev-ids run ... --delay D` streams the split (since stage 2, `--record full|compact` sets what Jev and the LLMs read, D7); `--jobs N` sets the cores of a forest fit (default -1, all; the forests are the same
   for any value). Line 0 was run with:
 
   ```

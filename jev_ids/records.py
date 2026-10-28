@@ -76,9 +76,13 @@ def append_prediction(run_dir: Path, prediction: Prediction) -> None:
 
 
 def read_predictions(run_dir: Path) -> list[Prediction]:
-    """Every row of a run's predictions.jsonl; an absent file is an empty run."""
+    """Every row of a run's predictions.jsonl; an absent file is an empty run.
+
+    A row written before the compact record existed (docs/jevids-design.md, D7) has no `record` and read the values in full, so it gets
+    `full` here and groups apart from a compact run.
+    """
     path = run_dir / "predictions.jsonl"
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as handle:
-        return [json.loads(line) for line in handle if line.strip()]
+        return [{"record": "full"} | json.loads(line) for line in handle if line.strip()]

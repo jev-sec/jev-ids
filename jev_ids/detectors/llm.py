@@ -26,7 +26,7 @@ from agno.models.google import Gemini
 from agno.run.agent import RunOutput
 from pydantic import BaseModel, Field
 
-from jev_ids.dataset import Flow
+from jev_ids.dataset import Flow, record_text
 from jev_ids.detectors import chatgpt
 
 DEFAULT_MODEL = {"deepseek": "deepseek-flash", "openai": "gpt-5.6-luna", "gemini": "gemini-3.6-flash"}
@@ -48,15 +48,17 @@ class Judgement(BaseModel):
 class LLMDetector:
     """Judges Flows with an LLM through an Agno Agent: one call per Flow, no tools."""
 
-    def __init__(self, prompt: dict[str, Any], provider: str, model_id: str | None = None) -> None:
+    def __init__(self, prompt: dict[str, Any], provider: str, model_id: str | None = None, record: str = "compact") -> None:
         """Keep the prompt and build the Agno model once.
 
         Args:
             prompt: `run.load_prompt` of `prompts/<dataset>/llm.md`.
             provider: `deepseek`, `openai` or `gemini`.
             model_id: the provider's model id; None means the provider default.
+            record: how the values of the Flow and the Examples are written, one of `dataset.RECORDS`.
         """
         self.template: str = prompt["text"]
+        self.record = record
         self.prompt_hash: str = prompt["sha256"]
         self.provider = provider
         self.model = model_id or DEFAULT_MODEL[provider]
@@ -74,7 +76,7 @@ class LLMDetector:
         # `Any` because Agno's `run` overloads are partially untyped for pyright.
         agent: Any = Agent(
             model=self.agno_model,
-            instructions=instructions(self.template, examples),
+            instructions=instructions(self.template, examples, self.record),
             output_schema=Judgement,
             use_json_mode=self.provider == "deepseek",
             markdown=False,
@@ -83,19 +85,19 @@ class LLMDetector:
         )
         started = time.perf_counter()
         try:
-            run: RunOutput = agent.run(f"Record:\n{flow.attributes_csv}")
+            run: RunOutput = agent.run(f"Record:\n{record_text(flow, self.record)}")
         except Exception as exc:  # every provider error is recorded, not raised
             return {"error": f"{type(exc).__name__}: {exc}"[:500]}
         return measurements(run, (time.perf_counter() - started) * 1000)
 
 
-def instructions(template: str, examples: Sequence[Flow]) -> str:
-    """The prompt file with `{examples}` filled with the labeled Examples.
+def instructions(template: str, examples: Sequence[Flow], record: str = "compact") -> str:
+    """The prompt file with `{examples}` filled with the labeled Examples, their values written as `record` says.
 
     Examples are labeled by Category only, because attack names never reach a model (CONTEXT.md); at k = 0 the placeholder is removed. The
     word "JSON" in the file is required: DeepSeek's `json_object` mode refuses a prompt that does not mention it.
     """
-    lines = "".join(f"{e.attributes_csv} => {e.category}\n" for e in examples)
+    lines = "".join(f"{record_text(e, record)} => {e.category}\n" for e in examples)
     return template.replace("{examples}", EXAMPLES_HEADER + lines if lines else "")
 
 

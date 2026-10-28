@@ -52,10 +52,19 @@ def test_run_files_append_and_read_back(tmp_path: Path) -> None:
     rows = records.read_predictions(run_dir)
     assert [p["p_attack"] for p in rows] == [0.2, 0.9]
     # Every key reaches the file but `raw`, which goes to responses.jsonl instead.
-    assert set(rows[0]) == set(first) - {"raw"}
-    assert set(rows[1]) == set(second)
+    assert set(rows[0]) == set(first) - {"raw"} | {"record"}  # a row without `record` reads back as `full`
+    assert set(rows[1]) == set(second) | {"record"}
     assert (run_dir / "config.json").read_text(encoding="utf-8").startswith("{")
     responses = (run_dir / "responses.jsonl").read_text(encoding="utf-8")
     assert responses.count("\n") == 1
     assert '"request_id": "q3", "response": {"ok": true}' in responses
     assert records.read_predictions(tmp_path / "missing") == []
+
+
+def test_read_predictions_marks_a_row_without_record_as_full(tmp_path: Path) -> None:
+    # Rows written before the compact record existed (docs/jevids-design.md, D7) read the values in full.
+    old = make_prediction(1, 1, 0.9)
+    old.pop("record", None)
+    records.append_prediction(tmp_path, old)
+    records.append_prediction(tmp_path, {**make_prediction(2, 1, 0.9), "record": "compact"})
+    assert [row["record"] for row in records.read_predictions(tmp_path)] == ["full", "compact"]

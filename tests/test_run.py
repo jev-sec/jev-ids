@@ -84,19 +84,20 @@ def test_execute_covers_every_cell_in_order_and_writes_the_three_files(card: Pat
     assert detector.calls == zero_shot * 2 + one_shot * 2
     assert {p["n_examples"] for p in predictions} == {0, 3}
     shared = {
-        *("run_id", "dataset", "detector", "model", "split", "prompt_hash"),
+        *("run_id", "dataset", "detector", "model", "split", "prompt_hash", "record"),
         *("k", "seed", "repetition", "n_examples", "row_id", "is_attack", "classification_verdict"),
         *("category_true", "novel_attack", "p_attack", "category_pred"),
         *("latency_ms", "usage", "request_id", "ts_utc"),
     }
     assert all(set(p) == shared for p in predictions)
-    assert {(p["dataset"], p["detector"], p["prompt_hash"]) for p in predictions} == {("test", "fake", "h")}
+    assert {(p["dataset"], p["detector"], p["prompt_hash"], p["record"]) for p in predictions} == {("test", "fake", "h", "compact")}
     assert run_dir.name.endswith("-test-fake-smoke")
     responses = (run_dir / "responses.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(responses) == len(predictions)
     assert json.loads(responses[0])["request_id"] == predictions[0]["request_id"]
     config_json = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     assert config_json["spec"]["k_values"] == [0, 1]
+    assert config_json["spec"]["record"] == "compact"
     assert config_json["spec"]["dataset"] == str(card)
     assert config_json["dataset"] == {"name": "test", "sha256": config["sha256"]}
     split_sha256 = hashlib.sha256((card.parent / "splits" / "smoke.csv").read_bytes()).hexdigest()

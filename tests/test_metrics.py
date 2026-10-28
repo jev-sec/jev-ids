@@ -162,6 +162,12 @@ def test_usage_averages_every_number_present_and_ignores_the_rest() -> None:
     assert metrics.mean([]) is None
 
 
+def test_summarize_keeps_full_and_compact_records_apart() -> None:
+    # Line 0 and line 1 share every other field, prompt hash included, so only `record` tells them apart.
+    rows = [make_prediction(1, 1, 0.9, record="full"), make_prediction(1, 1, 0.9, record="compact")]
+    assert [row["record"] for row in metrics.summarize(rows)] == ["compact", "full"]
+
+
 def test_summarize_has_one_row_per_group_averaged_over_cells() -> None:
     predictions = [
         make(1, 1, 0.9, seed=0),
@@ -174,7 +180,7 @@ def test_summarize_has_one_row_per_group_averaged_over_cells() -> None:
         prediction["model"] = "jev-1.13.0"
     zero_shot, one_shot = metrics.summarize(predictions)
     assert (zero_shot["k"], one_shot["k"]) == (0, 1)
-    assert list(one_shot)[:6] == ["dataset", "detector", "model", "split", "delay", "k"]
+    assert list(one_shot)[:7] == ["dataset", "detector", "model", "split", "delay", "record", "k"]
     assert one_shot["dataset"] == "test"
     assert (one_shot["cells"], one_shot["flows"], one_shot["predictions"]) == (2, 2, 4)
     # The seed 0 cell has F1 = 1 and the seed 1 cell F1 = 0.

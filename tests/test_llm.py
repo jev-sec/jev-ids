@@ -66,6 +66,20 @@ def test_instructions_fill_the_examples_placeholder_or_remove_it() -> None:
     assert "\na,b,c\n\nAnswer only" in zero_shot
 
 
+def test_the_record_and_the_examples_are_written_as_the_record_says(fake_agent: type[FakeAgent]) -> None:
+    judgement = llm.Judgement(verdict="attack", category="dos", p_attack=0.93)
+    fake_agent.outcomes = [run_output(judgement), run_output(judgement)]
+    flow = make_flow(9, "dos", value="168.86187098953056")
+    example = make_flow(1, "normal", value="0.0")
+    llm.LLMDetector(LLM_PROMPT, "deepseek").predict(flow, [example])
+    llm.LLMDetector(LLM_PROMPT, "deepseek", record="full").predict(flow, [example])
+    compact, full = fake_agent.built
+    assert compact["message"] == "Record:\n168.9,168.9,168.9"
+    assert "0,0,0 => normal" in compact["instructions"]
+    assert full["message"] == f"Record:\n{flow.attributes_csv}"
+    assert f"{example.attributes_csv} => normal" in full["instructions"]
+
+
 def test_happy_path_builds_one_agent_per_call_and_keeps_agno_metrics(
     fake_agent: type[FakeAgent],
 ) -> None:

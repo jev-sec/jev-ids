@@ -32,6 +32,7 @@ class IsolationForestDetector:
 
     name = "isolation_forest"
     prompt_hash = None  # the forest reads no prompt
+    record = "full"  # the forest reads the values themselves, never rounded (docs/jevids-design.md, D7)
 
     def __init__(self, vocabulary: Vocabulary, benign: str, jobs: int = 1) -> None:
         """Keep the encoding and the benign label; fitting waits for `predict`.

@@ -5,6 +5,7 @@ In reading order:
 - `Flow`: one record of a dataset, as its CSV row has it.
 - `load_config`: the card `dataset.json` as a dict, hashed.
 - `flow_from_row` and `load_split`: a CSV in the shared shape as Flows.
+- `record_text` and `compact_value`: a Flow's values as the text a model reads, in full or compact (docs/jevids-design.md, D7).
 - `category_by_name`, `split_header` and `write_split`: the card's label table and the same shape, for the preparation scripts.
 
 A dataset lives in `data/<name>/`: `dataset.json` (the card), `pool.csv` (the Flows that Examples are drawn from) and `splits/<split>.csv`
@@ -20,9 +21,12 @@ not a separate type, so Examples are plain Flows here.
 import csv
 import hashlib
 import json
+import math
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +98,40 @@ def load_split(path: Path, config: Config) -> list[Flow]:
     """Every Flow of one CSV in the shared shape: a split file or the pool."""
     with path.open(encoding="utf-8", newline="") as handle:
         return [flow_from_row(row, config) for row in csv.DictReader(handle)]
+
+
+# How a Flow's values are written in the text a model reads: `full` as the CSV has them, the protocol of the first paper and of line 0;
+# `compact` with 4 significant digits (docs/jevids-design.md, D7). The forests always read the full values.
+RECORDS = ("full", "compact")
+SIGNIFICANT_DIGITS = 4
+INTEGER = re.compile(r"-?\d+")
+
+
+def record_text(flow: Flow, record: str) -> str:
+    """The Flow's values as the comma-separated text a model reads; `record` is one of RECORDS."""
+    if record == "full":
+        return flow.attributes_csv
+    if record == "compact":
+        return ",".join(compact_value(value) for value in flow.attribute_values)
+    raise ValueError(f"record {record!r} is not one of {RECORDS}")
+
+
+def compact_value(value: str) -> str:
+    """One value with 4 significant digits and no exponent, so `25160.418777440053` becomes `25160` and `168.86187098953056` `168.9`.
+
+    An integer stays as it is, whatever its length: a port such as `44321` is a name more than a size, and rounding `20694308` to
+    `20690000` would not shorten it. A value that is not a finite number (NSL-KDD's `tcp`, `inf`, `nan`) stays as it is too. A decimal
+    with an integer value loses its `.0`: `0.0` becomes `0`.
+    """
+    if INTEGER.fullmatch(value):
+        return value
+    try:
+        number = float(value)
+    except ValueError:
+        return value
+    if not math.isfinite(number):
+        return value
+    return format(Decimal(f"{number:.{SIGNIFICANT_DIGITS}g}"), "f")
 
 
 def category_by_name(config: Config) -> dict[str, str]:

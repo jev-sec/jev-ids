@@ -66,3 +66,36 @@ def test_each_committed_card_is_consistent(name: str, features: int, categories:
 def test_the_nsl_kdd_card_maps_every_attack_name() -> None:
     config = dataset.load_config(ROOT / "data" / "nsl-kdd" / "dataset.json")
     assert sum(len(names) for names in config["attack_names"].values()) == 39
+
+
+def test_compact_value_keeps_four_significant_digits_and_the_order_of_magnitude() -> None:
+    # Large and small values keep their order of magnitude, the proof of stage 2 (docs/jevids-design.md, D7), and never get an exponent.
+    cases = {
+        "25160.418777440053": "25160",
+        "168.86187098953056": "168.9",
+        "520518.0347826088": "520500",
+        "1.9295159033373677": "1.93",
+        "0.0000123456": "0.00001235",
+        "1.5e-07": "0.00000015",
+        "-3.14159": "-3.142",
+    }
+    for value, compact in cases.items():
+        assert dataset.compact_value(value) == compact
+        assert abs(float(compact) - float(value)) <= 5e-4 * abs(float(value))
+    for value in ("123456789.123", "0.000987654", "4.2e-05", "98765.4321"):
+        assert "e" not in dataset.compact_value(value)
+
+
+def test_compact_value_leaves_integers_and_non_numbers_and_drops_a_bare_point_zero() -> None:
+    for value in ("44321", "119719148", "-1", "0", "tcp", "REJ", "inf", "nan", ""):
+        assert dataset.compact_value(value) == value
+    assert [dataset.compact_value(value) for value in ("0.0", "37.0", "-1.0")] == ["0", "37", "-1"]
+
+
+def test_record_text_is_full_or_compact_and_never_changes_the_flow() -> None:
+    flow = dataset.Flow(row_id=1, attributes_csv="53,tcp,25160.418777440053,0.0", category="normal", is_attack=False)
+    assert dataset.record_text(flow, "full") == flow.attributes_csv
+    assert dataset.record_text(flow, "compact") == "53,tcp,25160,0"
+    assert flow.attribute_values == ("53", "tcp", "25160.418777440053", "0.0")
+    with pytest.raises(ValueError, match="record"):
+        dataset.record_text(flow, "short")

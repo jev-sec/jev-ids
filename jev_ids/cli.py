@@ -22,6 +22,7 @@ from typing import Any
 from dotenv import load_dotenv
 
 from jev_ids import ROOT, metrics, run
+from jev_ids.dataset import RECORDS
 from jev_ids.records import read_predictions
 
 
@@ -60,6 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
     runner.add_argument("--results-dir", type=Path, default=run.RESULTS_DIR, help="where the run directory is created")
     runner.add_argument("--delay", type=int, help="stream the split with this feedback delay D, in Flows (docs/jevids-design.md, D4)")
     runner.add_argument("--jobs", type=int, default=-1, help="CPU cores each forest fit may use; -1 for all, the default")
+    runner.add_argument(
+        "--record",
+        choices=RECORDS,
+        default="compact",
+        help="values Jev and the LLMs read: 4 significant digits (compact, the default) or as the CSV has them (full)",
+    )
     runner.set_defaults(handler=run_command)
 
     redoer = commands.add_parser("redo-errors", help="complete a run in place: its error rows again, its missing flows for the first time")
@@ -103,6 +110,7 @@ def run_command(args: argparse.Namespace) -> None:
         results_dir=args.results_dir,
         delay=args.delay,
         jobs=args.jobs,
+        record=args.record,
     )
     run.run_from_spec(spec)
 

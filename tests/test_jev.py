@@ -74,6 +74,18 @@ def test_request_body_adds_the_flow_the_examples_and_the_rubric(detector: jev.Je
     assert "examples" not in jev.request_body(detector.template, FLOW, [])["state"]
 
 
+def test_request_body_writes_the_flow_and_the_examples_as_the_record_says(detector: jev.JevDetector) -> None:
+    flow = make_flow(9, "dos", value="25160.418777440053")
+    example = make_flow(1, "normal", value="0.0")
+    compact = jev.request_body(detector.template, flow, [example])["state"]
+    assert compact["flows"] == {"under_test": "25160,25160,25160"}
+    assert compact["examples"] == [{"record": "0,0,0", "category": "normal"}]
+    full = jev.request_body(detector.template, flow, [example], "full")["state"]
+    assert full["flows"] == {"under_test": flow.attributes_csv}
+    assert full["examples"][0]["record"] == example.attributes_csv
+    assert (detector.record, jev.JevDetector(JEV_PROMPT, "full").record) == ("compact", "full")
+
+
 def test_predict_sends_the_body_as_is_and_reads_the_answer_and_the_version(detector: jev.JevDetector) -> None:
     sent: list[dict[str, Any]] = []
     detector.client = serving(httpx2.Response(200, json=BODY), sent=sent)

@@ -60,6 +60,8 @@ class RunSpec:
             experiment.
         delay: the feedback delay D in steps for a stream run (docs/jevids-design.md, D4); None judges every Flow against one fixed draw
             of Examples, the protocol of the first paper.
+        record: how Jev and the LLMs read a Flow's values, `full` or `compact` (`dataset.RECORDS`, docs/jevids-design.md, D7); the
+            forests always read them in full.
     """
 
     detector: str
@@ -72,6 +74,7 @@ class RunSpec:
     results_dir: Path = RESULTS_DIR
     delay: int | None = None
     jobs: int = 1
+    record: str = "compact"
 
 
 def load_prompt(path: Path) -> dict[str, Any]:
@@ -88,10 +91,10 @@ def build_detector(spec: RunSpec, config: Config) -> Detector:
     """The Detector named in the spec; Jev and the LLMs get their prompt file."""
     prompts = ROOT / "prompts" / config["name"]
     if spec.detector == "jev":
-        return JevDetector(load_prompt(prompts / "jev.json"))
+        return JevDetector(load_prompt(prompts / "jev.json"), spec.record)
     if spec.detector in ("llm:deepseek", "llm:openai", "llm:gemini"):
         provider = spec.detector.removeprefix("llm:")
-        return LLMDetector(load_prompt(prompts / "llm.md"), provider, spec.model_id)
+        return LLMDetector(load_prompt(prompts / "llm.md"), provider, spec.model_id, spec.record)
     if spec.detector in ("random_forest", "isolation_forest"):
         # The one-hot vocabulary comes from the whole pool, never from the Examples, and both forests encode a Flow the same way.
         pool = dataset.load_split(config["dir"] / "pool.csv", config)
@@ -165,7 +168,8 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
             "started_at": started.isoformat(timespec="seconds"),
         },
     )
-    # The fields every row of this run shares; a cell adds k, seed, rep and the number of Examples.
+    # The fields every row of this run shares; a cell adds k, seed, rep and the number of Examples. `record` is in every row because the
+    # prompt hash does not change with it: the same template is filled with full or compact values.
     run_fields: dict[str, Any] = {
         "run_id": run_id,
         "dataset": config["name"],
@@ -173,6 +177,7 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
         "model": detector.model,
         "split": spec.split,
         "prompt_hash": detector.prompt_hash,
+        "record": detector.record,
     }
     if spec.delay is not None:
         split_path = config["dir"] / "splits" / f"{spec.split}.csv"
@@ -242,6 +247,8 @@ def redo_errors(run_dir: Path) -> Path:
         reps=fields["reps"],
         model_id=fields["model_id"],
         results_dir=Path(fields["results_dir"]),
+        # A run made before the compact record existed read the values in full.
+        record=fields.get("record", "full"),
     )
     config = dataset.load_config(spec.dataset)
     flows = dataset.load_split(config["dir"] / "splits" / f"{spec.split}.csv", config)
