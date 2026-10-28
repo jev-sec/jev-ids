@@ -16,7 +16,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
-| Stage 5                                 | Commit `805d7e4`, cut 0.64 from the validation stream, line 4 below     |
+| Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below           |
 | Stage 6                                 | Not started                                                             |
 
 ## Goal
@@ -436,7 +436,18 @@ without changing the Verdict.
 
 The validation stream chose the cut p_attack ≥ 0.64 before line 4 was computed. It is the full system of line 3 run at commit `805d7e4` over the 300 validation Flows (177 BENIGN, 123 attacks, no novel attack), seeds 0 to 2, with no failed call (`results/design-cicids2017/20261028T204508.479115Z-cicids2017-jev-validation`). `jev-ids threshold` picked 0.64 among 91 distinct p_attack values, because Jev reports them to two decimals. On the validation stream the cut raised mean F1 from 0.933 to 0.985 and cut false alarms from 17.7 to 2.3 per seed. It also missed 1.3 attacks per seed where 0.5 missed none, the four attacks of seed 0 with p_attack between 0.60 and 0.62. PR-AUC was 0.999.
 
-Line 4 is line 3's rows taken again at 0.64 (D9), computed only after this paragraph was committed.
+Line 4 is line 3's rows taken again at 0.64 (D9), computed only after this paragraph was committed (`fc0c8c6`). Its Examples, tokens and cost are therefore line 3's.
+
+| Detector                         | F1            | Precision | Recall | Novel recall | Novel, first contact | False alarms | Missed | PR-AUC | Examples per request | Input tokens per request | Cost per 1M Flows |
+| -------------------------------- | ------------- | --------- | ------ | ------------ | -------------------- | ------------ | ------ | ------ | -------------------- | ------------------------ | ----------------- |
+| Line 3: Jev, AIMD k and Selector | 0.961 ± 0.006 | 0.925     | 1.000  | 1.000        | 9 of 9               | 12.3         | 0      | 0.998  | 3.6                  | 2,673                    | 112 USD           |
+| Line 4: line 3 at 0.64           | 0.977 ± 0.003 | 0.984     | 0.969  | 0.931        | 6 of 9               | 2.3          | 4.7    | 0.998  | 3.6                  | 2,673                    | 112 USD           |
+
+The cut did on the pilot what it did on the validation stream. Mean F1 rose from 0.961 to 0.977 and false alarms fell from 12.3 to 2.3 per seed, but 4.7 attacks per seed went missed where line 3 missed none, 3.3 of them novel. Novel recall fell from 1.000 to 0.931 and first contact from 9 of 9 to 6 of 9, because the DoS Slowhttptest Flow at first contact scored below 0.64 in every seed. `Infiltration - Portscan` lost 2, 2 and 3 Flows after feedback, DoS Slowloris one known Flow per seed and Portscan one in seed 0. Every missed attack scored between 0.54 and 0.61.
+
+McNemar of line 3 against line 4 over all Flows gives 5 to 11, 4 to 11 and 5 to 8 for line 4 (p = 0.21, 0.12, 0.58), not significant on any seed. On novel attacks line 3 wins 3 to 0, 3 to 0 and 4 to 0 (p = 0.25, 0.25, 0.125). Against the Random Forest (seed 0) line 4 ties 6 to 6 overall (p = 1.0) and leads 5 to 2 on novel attacks (p = 0.45), where line 3 led 6 to 0 (p = 0.031). Against the kNN with K = 4 it leads 13 to 5 overall (p = 0.096) and 12 to 1 on novel attacks (p = 0.0034).
+
+The cut buys precision with novel recall, the measure this design values most. The validation stream could not show that trade, because it holds no novel attack (the limit stated in the evaluation rules). The ablation without the threshold in stage 6 measures it on 300 novel attacks.
 
 ## Changes after results
 
