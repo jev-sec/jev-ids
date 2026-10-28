@@ -448,3 +448,12 @@ k = 1 (3.6 against about 3.1), so line 3's cost cut could come from starting at 
 Changed: nothing in the design. One comparison is added, decided before it was run: Jev with the `Selector` at a fixed k = 1
 (`--k 1 --control fixed`), seeds 0 to 2, pilot, D = 1. If it matches line 3, the mirrored AIMD adds nothing beyond "one Example per
 Category"; if it errs more, the reaction to errors pays for itself.
+
+Result (`results/design-cicids2017/20261028T190345.176385Z-cicids2017-jev-pilot`, commit `a0a45b0`): the fixed k = 1 control matched
+line 3. F1 0.964 ± 0.006 against 0.961 ± 0.006, false alarms 11.3 against 12.3, no attack missed by either, novel recall 1.000 and
+9 of 9 at first contact for both, PR-AUC 0.998 for both, 3.1 against 3.6 Examples and 106 against 112 USD per 1M Flows. McNemar of
+line 3 against the control, per seed, all Flows: 1 to 6, 3 to 4 and 7 to 4 (p = 0.13, 1.0, 0.55); no discordant attack. The one
+measurable effect of the controller is on the Category, not the Verdict: DDoS Flows named DoS fell from 22 to 15. On the pilot,
+therefore, the cost cut of line 3 comes from k₀ = 1 and the `Selector`, not from the reaction to errors. The pilot gives the controller
+few errors to react to (no missed attack in either run, 9 novel Flows at first contact), so this does not settle the question for the
+paper split, where 300 novel attacks and D up to 500 test the reaction to errors; it does mean the AIMD cannot be claimed from the pilot.
