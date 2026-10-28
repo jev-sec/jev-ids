@@ -1,4 +1,4 @@
-"""CLI wiring for the run, redo-errors, metrics and compare subcommands."""
+"""CLI wiring for the run, redo-errors, metrics, compare, sign-test and threshold subcommands."""
 
 from pathlib import Path
 
@@ -95,3 +95,18 @@ def test_sign_test_prints_every_subset_with_holm_p(tmp_path: Path, capsys: pytes
     assert lines[0] == "subset,k,flows,a_better,b_better,sign_p,holm_p"
     # The known subset holds no flow, so only `all` and `novel` give a row, and Holm caps both adjusted p-values at 1.
     assert lines[1:] == ["all,1,1,1,0,1.0,1.0", "novel,1,1,1,0,1.0,1.0"]
+
+
+def test_threshold_prints_the_cut_and_metrics_and_compare_take_verdicts_again(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    validation = tmp_path / "validation"
+    records.append_prediction(validation, make_prediction(1, 1, 0.3, split="validation"))
+    records.append_prediction(validation, make_prediction(2, 0, 0.1, split="validation"))
+    assert cli.main(["threshold", str(validation)]) == 0
+    assert capsys.readouterr().out.splitlines() == ["threshold,f1_mean,f1_mean_at_0.5", "0.3,1.0,0.0"]
+    # Cutting at 0.3 turns the attack's Verdict into an alert, so F1 goes from 0 to 1.
+    assert cli.main(["metrics", str(validation), "--threshold", "0.3"]) == 0
+    header, values = capsys.readouterr().out.splitlines()
+    assert dict(zip(header.split(","), values.split(","), strict=True))["f1_mean"] == "1.0"
+    # Comparing the same run at 0.5 (A) and at 0.3 (B) leaves one discordant pair, which B gets right.
+    assert cli.main(["compare", "--a", str(validation), "--b", str(validation), "--threshold-b", "0.3"]) == 0
+    assert capsys.readouterr().out.splitlines()[1] == "1,1,0,0,2,1,0,1,1.0,0.0,1.0"

@@ -16,7 +16,8 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
-| Stages 5 and 6 below                    | Not started                                                             |
+| Stage 5                                 | Cut and commands fixed in D9, validation stream not run yet             |
+| Stage 6                                 | Not started                                                             |
 
 ## Goal
 
@@ -192,6 +193,12 @@ may save tokens as a side effect.
 The verdict is p_attack ≥ 0.5 today (`docs/protocol.md`). On the pilot, Jev at k = 8 had PR-AUC 0.989 but precision 0.893, which suggests
 the ranking is good and the 0.5 cut is not. The cut is chosen on a validation stream drawn from the pool, as the last stage, because the
 dynamic k changes the distribution of p_attack.
+
+Fixed on 2026-10-28, before the validation stream was run:
+
+- Criterion. The cut is the one with the highest F1 averaged over the (seed, rep) cells of the validation stream, the same F1 the line tables report. The candidates are 0.5 and every p_attack in the validation rows, because F1 only changes where the cut passes a row. A tie goes to the candidate nearest 0.5, so the cut moves only as far as F1 asks. A Flow is an attack when p_attack ≥ cut, as it was with 0.5.
+- Validation stream. The full system of line 3 (the `Selector`, the mirrored AIMD from k₀ = 1, the compact record) over `splits/validation.csv`, D = 1, seeds 0 to 2. Its Flows stay in the pool, and `Memory.visible` returns only pool Flows that ended before the judged one, so no Flow is its own Example (`test_a_pool_flow_judged_in_a_stream_is_never_its_own_example`).
+- Where the cut lives. `jev-ids threshold` prints the cut from the validation runs and refuses rows of any other split, so a test split never shapes it. `jev-ids metrics --threshold` and `jev-ids compare --threshold-a/--threshold-b` take every Verdict again at a cut after the run. The Verdict feeds nothing in a stream (the `Selector` reads p_attack and the Category, the `KController` reads the Category), so a new cut changes no Example. Line 4 is therefore line 3's rows taken again at the cut, with no new call to Jev. The cut is written in line 4 below before line 4 is computed.
 
 ### D10. Baselines see what Jev IDS sees
 

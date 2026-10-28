@@ -72,6 +72,38 @@ def test_scores_count_a_row_without_verdict_as_normal_and_as_an_error() -> None:
     assert (empty["pr_auc"], empty["roc_auc"]) == (None, None)
 
 
+def test_at_threshold_takes_every_verdict_again_and_keeps_failed_calls_without_one() -> None:
+    assert [row["classification_verdict"] for row in metrics.at_threshold(CELL, 0.15)] == [1, 1, None, 0, 1, 1]
+    # Leaving the rows given untouched, so line 3 and line 4 are read from the same run.
+    assert [row["classification_verdict"] for row in CELL] == [1, 0, None, 0, 1, 1]
+
+
+def test_best_threshold_takes_the_best_mean_f1_and_reads_the_validation_stream_only() -> None:
+    # Giving each seed two attacks and two normal Flows. At 0.3 both cells have F1 0.8, the best mean of every candidate.
+    rows = [
+        make(row_id, is_attack, p_attack, seed=seed, split="validation")
+        for row_id, is_attack, p_attack, seed in [
+            (1, 1, 0.9, 0),
+            (2, 1, 0.3, 0),
+            (3, 0, 0.2, 0),
+            (4, 0, 0.6, 0),
+            (1, 1, 0.8, 1),
+            (2, 1, 0.4, 1),
+            (3, 0, 0.1, 1),
+            (4, 0, 0.35, 1),
+        ]
+    ]
+    best = metrics.best_threshold(rows)
+    assert best["threshold"] == 0.3
+    assert best["f1_mean"] == pytest.approx(0.8)
+    assert best["f1_mean_at_0.5"] == pytest.approx((1 / 2 + 2 / 3) / 2)
+    # Keeping 0.5 when another cut only ties it, as 0.9 does here with F1 1.
+    tie = [make(1, 1, 0.9, split="validation"), make(2, 0, 0.2, split="validation")]
+    assert metrics.best_threshold(tie)["threshold"] == 0.5
+    with pytest.raises(ValueError, match="validation stream only"):
+        metrics.best_threshold([make(1, 1, 0.9, split="pilot")])
+
+
 def test_scores_break_recall_down_by_category_and_rank_p_attack_without_the_cut() -> None:
     rows = [
         make(1, 1, 0.9, novel=True),  # dos, novel, hit

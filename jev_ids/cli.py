@@ -1,11 +1,12 @@
-"""The command line: `jev-ids run|redo-errors|metrics|compare|sign-test`, also reachable as `python -m jev_ids`.
+"""The command line: `jev-ids run|redo-errors|metrics|compare|sign-test|threshold`, also reachable as `python -m jev_ids`.
 
 In reading order:
 
 - `parse_k` and `parse_list`: the list arguments (`--k 0,1,all`).
-- `build_parser`: the five subcommands and their arguments.
-- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`: one handler per subcommand, each turning
-  the parsed arguments into calls of `run` or `metrics`.
+- `build_parser`: the six subcommands and their arguments.
+- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`, `threshold_command`: one handler per
+  subcommand, each turning the parsed arguments into calls of `run` or `metrics`.
+- `read_runs`: the rows of the run directories given, cut again at a threshold when one is given.
 - `print_csv`: a table as CSV on stdout.
 - `main`: parse, dispatch, return the exit code.
 
@@ -23,7 +24,7 @@ from dotenv import load_dotenv
 
 from jev_ids import ROOT, metrics, run
 from jev_ids.dataset import RECORDS
-from jev_ids.records import read_predictions
+from jev_ids.records import Prediction, read_predictions
 
 
 def parse_k(text: str) -> int | None:
@@ -41,7 +42,7 @@ def parse_list(text: str) -> tuple[int | None, ...]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """The five subcommands; each one carries the function that handles it."""
+    """The six subcommands, each carrying the function that handles it."""
     parser = argparse.ArgumentParser(prog="jev-ids")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -89,6 +90,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     reporter = commands.add_parser("metrics", help="summarize one or more runs")
     reporter.add_argument("run_dirs", nargs="+", type=Path, help="results/<run_id> directories")
+    reporter.add_argument("--threshold", type=float, help="take every Verdict again at p_attack >= this cut instead of 0.5 (D9)")
     reporter.set_defaults(handler=metrics_command)
 
     comparer = commands.add_parser("compare", help="paired comparison of two detectors over the same split")
@@ -102,12 +104,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     comparer.add_argument("--k-a", help="cut run A to this k or `all`")
     comparer.add_argument("--k-b", help="cut run B to this k or `all`")
+    comparer.add_argument("--threshold-a", type=float, help="take the Verdicts of A again at this cut instead of 0.5 (D9)")
+    comparer.add_argument("--threshold-b", type=float, help="take the Verdicts of B again at this cut instead of 0.5 (D9)")
     comparer.set_defaults(handler=compare_command)
 
     signer = commands.add_parser("sign-test", help="flow-level sign test of two detectors on every subset and k, Holm-adjusted")
     signer.add_argument("--a", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector A")
     signer.add_argument("--b", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector B")
     signer.set_defaults(handler=sign_test_command)
+
+    tuner = commands.add_parser("threshold", help="the cut on p_attack with the best mean F1 over the validation runs given (D9)")
+    tuner.add_argument("run_dirs", nargs="+", type=Path, help="results/<run_id> directories of the validation stream")
+    tuner.set_defaults(handler=threshold_command)
     return parser
 
 
@@ -139,8 +147,7 @@ def redo_command(args: argparse.Namespace) -> None:
 
 def metrics_command(args: argparse.Namespace) -> None:
     """`metrics`: one CSV row per group over every run given, on stdout."""
-    predictions = [p for run_dir in args.run_dirs for p in read_predictions(run_dir)]
-    print_csv(metrics.summarize(predictions))
+    print_csv(metrics.summarize(read_runs(args.run_dirs, args.threshold)))
 
 
 def compare_command(args: argparse.Namespace) -> None:
@@ -149,15 +156,14 @@ def compare_command(args: argparse.Namespace) -> None:
         raise SystemExit("--k-a and --k-b come together")
     across_k = None if args.k_a is None else (parse_k(args.k_a), parse_k(args.k_b))
     # A detector may be spread over several run directories (one k each, run in parallel); each side is the union of its rows.
-    run_a = metrics.only_subset([p for run_dir in args.a for p in read_predictions(run_dir)], args.subset)
-    run_b = metrics.only_subset([p for run_dir in args.b for p in read_predictions(run_dir)], args.subset)
+    run_a = metrics.only_subset(read_runs(args.a, args.threshold_a), args.subset)
+    run_b = metrics.only_subset(read_runs(args.b, args.threshold_b), args.subset)
     print_csv(metrics.compare(run_a, run_b, across_k))
 
 
 def sign_test_command(args: argparse.Namespace) -> None:
     """`sign-test`: the flow-level sign test on all flows, known and novel attacks, with Holm's adjustment across every row, as CSV."""
-    run_a = [p for run_dir in args.a for p in read_predictions(run_dir)]
-    run_b = [p for run_dir in args.b for p in read_predictions(run_dir)]
+    run_a, run_b = read_runs(args.a), read_runs(args.b)
     table = [
         {"subset": subset, **row}
         for subset in ("all", "known", "novel")
@@ -167,6 +173,17 @@ def sign_test_command(args: argparse.Namespace) -> None:
     for row, adjusted in zip(table, metrics.holm([float(row["sign_p"]) for row in table]), strict=True):
         row["holm_p"] = adjusted
     print_csv(table)
+
+
+def threshold_command(args: argparse.Namespace) -> None:
+    """`threshold`: the cut of D9 over the validation runs given, as one CSV row."""
+    print_csv([metrics.best_threshold(read_runs(args.run_dirs))])
+
+
+def read_runs(run_dirs: Sequence[Path], threshold: float | None = None) -> list[Prediction]:
+    """Every row of the run directories given, with each Verdict taken again at `threshold` when one is given (D9)."""
+    predictions = [prediction for run_dir in run_dirs for prediction in read_predictions(run_dir)]
+    return predictions if threshold is None else metrics.at_threshold(predictions, threshold)
 
 
 def print_csv(rows: Sequence[dict[str, Any]]) -> None:

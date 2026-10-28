@@ -9,9 +9,10 @@ from typing import Any
 
 import pytest
 
-from jev_ids import records, stream
+from jev_ids import records, run, selector, stream
 from jev_ids.dataset import Flow
 from jev_ids.detectors import jev
+from jev_ids.detectors.random_forest import vocabulary
 from tests.helpers import CONFIG, JEV_PROMPT, make_flow
 
 CATEGORIES: list[str] = CONFIG["categories"]
@@ -112,6 +113,18 @@ def test_a_cell_sees_only_the_past_and_writes_one_row_per_step(tmp_path: Path) -
     # Flow 103 comes after Flow 102 of the same novel name, but with D = 2 that label is not back yet.
     assert [row["first_contact"] for row in rows] == [None, True, True, None]
     assert [row["first_contact"] for row in run_cell(tmp_path / "d1", k=9, delay=1)[1]] == [None, True, False, None]
+
+
+def test_a_pool_flow_judged_in_a_stream_is_never_its_own_example(tmp_path: Path) -> None:
+    # Judging pool Flows through the Selector and the KController, as the validation stream of D9 does. A Flow ends exactly at its
+    # own `now`, so the clock keeps its pool copy out, although that copy would be the nearest candidate.
+    recorder = Recorder()
+    memory = stream.Memory(POOL, CATEGORIES, 1, NAMES)
+    chooser = selector.Selector(selector.Space(vocabulary(POOL, CONFIG), POOL))
+    cell = {"k": 1, "seed": 0, "repetition": 0, "delay": 1}
+    stream.stream_cell(tmp_path, recorder, memory, POOL, cell, run.choose_with(chooser, 1, CATEGORIES, "aimd"))
+    assert len(recorder.calls) == len(POOL)
+    assert all(flow.row_id not in {example.row_id for example in examples} for flow, examples in recorder.calls)
 
 
 def test_no_attack_name_reaches_a_request(tmp_path: Path) -> None:

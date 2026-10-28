@@ -89,7 +89,7 @@ k is the number of labeled examples per category. k = 1 with five categories mea
 
 | File                                                                   | Job                                                                        |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| [cli.py](jev_ids/cli.py)                                               | `run`, `redo-errors`, `metrics`, `compare` and `sign-test`                 |
+| [cli.py](jev_ids/cli.py)                                               | `run`, `redo-errors`, `metrics`, `compare`, `sign-test` and `threshold`    |
 | [dataset.py](jev_ids/dataset.py)                                       | The card, the pool, the splits and the k-shot example draw                 |
 | [run.py](jev_ids/run.py)                                               | The loop, cell by cell and flow by flow, and the three files of a run      |
 | [records.py](jev_ids/records.py)                                       | One prediction row and its JSONL                                           |

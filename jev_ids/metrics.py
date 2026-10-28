@@ -1,10 +1,10 @@
-"""Tables from predictions.jsonl rows: `summarize` one or more runs, `compare` or `sign_test` two.
+"""Tables from predictions.jsonl rows: `summarize` one or more runs, `compare` or `sign_test` two, `best_threshold` on validation.
 
-Helpers first (`verdict`, `mean`, `ratio`, `rate`, `only_subset`, `only_k`, `group_by_fields`), then the scores of one set
+Helpers first (`verdict`, `at_threshold`, `mean`, `ratio`, `rate`, `only_subset`, `only_k`, `group_by_fields`), then the scores of one set
 of rows (`recall_by_category`, `ranking`, `scores`), the priced usage (`cost_usd_per_1m`, `share_used`, `latency`, `usage`),
-the summary (`summary`, `none_last_key`, `summarize`) and the paired comparisons (`mcnemar_exact`, `holm`, `sign_test`,
-`compare_cell`, `compare`). Attack-class F1, not macro; a row without a Verdict counts as `normal` (fail-open) and ranks
-lowest; the CLI turns the dicts into CSV.
+the summary (`summary`, `none_last_key`, `summarize`), the cut of D9 (`best_threshold`) and the paired comparisons (`mcnemar_exact`,
+`holm`, `sign_test`, `compare_cell`, `compare`). F1 is the attack class's, not macro. A row without a Verdict counts as `normal`
+(fail-open) and ranks lowest, and the CLI turns the dicts into CSV.
 """
 
 import json
@@ -17,7 +17,7 @@ from typing import Any
 import sklearn.metrics  # pyright: ignore[reportMissingTypeStubs]
 
 from jev_ids import ROOT
-from jev_ids.records import Prediction
+from jev_ids.records import VERDICT_THRESHOLD, Prediction
 
 PRICES_PATH = ROOT / "prices.json"
 PredictionPair = tuple[Prediction, Prediction]
@@ -26,6 +26,18 @@ PredictionPair = tuple[Prediction, Prediction]
 def verdict(prediction: Prediction) -> int:
     """The Verdict of a row; without one (a failed call) it counts as normal."""
     return int(prediction.get("classification_verdict") or 0)
+
+
+def at_threshold(predictions: Iterable[Prediction], threshold: float) -> list[Prediction]:
+    """The rows with every Verdict taken again at p_attack ≥ `threshold` (D9), while a failed call still has none.
+
+    Nothing in a stream reads the Verdict. The `Selector` reads p_attack and the Category, and the `KController` reads the Category.
+    A new cut therefore changes no Example, and the rows of a finished run can be cut again.
+    """
+    return [
+        {**prediction, "classification_verdict": None if prediction.get("p_attack") is None else int(prediction["p_attack"] >= threshold)}
+        for prediction in predictions
+    ]
 
 
 def mean(values: Iterable[float | None]) -> float | None:
@@ -201,6 +213,25 @@ def summarize(predictions: Iterable[Prediction]) -> list[dict[str, Any]]:
     fields = ("dataset", "detector", "model", "split", "delay", "record", "selection", "control", "k")
     groups = group_by_fields(predictions, fields)
     return [{**dict(zip(fields, key, strict=True)), **summary(groups[key], prices)} for key in sorted(groups, key=none_last_key)]
+
+
+def best_threshold(predictions: Sequence[Prediction]) -> dict[str, float]:
+    """The cut on p_attack with the highest F1 averaged over the (seed, rep) cells, chosen on the validation stream (D9).
+
+    The candidates are VERDICT_THRESHOLD (0.5) and every p_attack present, because F1 only changes where the cut passes a row. A tie
+    goes to the candidate nearest 0.5, so the cut moves only as far as F1 asks. Rows of any split but `validation` are refused, so a
+    test split never shapes the cut.
+    """
+    if any(prediction["split"] != "validation" for prediction in predictions):
+        raise ValueError("the cut is chosen on the validation stream only (docs/jevids-design.md, D9)")
+    candidates = {VERDICT_THRESHOLD} | {prediction["p_attack"] for prediction in predictions if prediction.get("p_attack") is not None}
+    # Scoring each candidate as the summary does, with the F1 of every cell at that cut and then their mean.
+    f1_means: dict[float, float] = {}
+    for threshold in candidates:
+        cells = group_by_fields(at_threshold(predictions, threshold), ("seed", "repetition")).values()
+        f1_means[threshold] = mean(scores(cell)["f1"] for cell in cells) or 0.0
+    best = max(candidates, key=lambda threshold: (f1_means[threshold], -abs(threshold - VERDICT_THRESHOLD)))
+    return {"threshold": best, "f1_mean": f1_means[best], "f1_mean_at_0.5": f1_means[VERDICT_THRESHOLD]}
 
 
 def mcnemar_exact(a_correct: int, b_correct: int) -> float:
