@@ -32,6 +32,7 @@ from jev_ids.dataset import Config, Flow
 from jev_ids.detectors import random_forest
 from jev_ids.detectors.isolation_forest import IsolationForestDetector
 from jev_ids.detectors.jev import JevDetector
+from jev_ids.detectors.knn import KNNDetector
 from jev_ids.detectors.llm import LLMDetector
 from jev_ids.detectors.random_forest import RandomForestDetector
 from jev_ids.records import append_prediction, complete_prediction, read_predictions, write_config
@@ -40,10 +41,11 @@ from jev_ids.stream import Choose, Memory, split_names, stream_cell
 
 RESULTS_DIR = ROOT / "results"
 SELECTIONS = ("random", "score")
-FORESTS = ("random_forest", "isolation_forest")
+# The Detectors that get the whole memory (k = all) instead of chosen Examples.
+WHOLE_MEMORY = ("random_forest", "isolation_forest", "knn")
 
 # The detectors share no base class; the run loop only needs `name`, `model`, `prompt_hash` and `predict`, which each of them has.
-Detector = JevDetector | LLMDetector | RandomForestDetector | IsolationForestDetector
+Detector = JevDetector | LLMDetector | RandomForestDetector | IsolationForestDetector | KNNDetector
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ class RunSpec:
             forests always read them in full.
         selection: how a stream gives Jev and the LLMs their Examples, `random` (line 0) or `score` (the `Selector`, D6); None means
             `score` for a stream and `random` otherwise, the only choice the protocol of the first paper has.
+        neighbours: K of the kNN, a number or `matched:k` (`knn.parse_neighbours`); None for every other Detector.
     """
 
     detector: str
@@ -81,6 +84,7 @@ class RunSpec:
     jobs: int = 1
     record: str = "compact"
     selection: str | None = None
+    neighbours: str | None = None
 
 
 def load_prompt(path: Path) -> dict[str, Any]:
@@ -106,6 +110,11 @@ def build_detector(spec: RunSpec, config: Config) -> Detector:
         pool = dataset.load_split(config["dir"] / "pool.csv", config)
         forest = RandomForestDetector if spec.detector == "random_forest" else IsolationForestDetector
         return forest(random_forest.vocabulary(pool, config), config["benign"], spec.jobs)
+    if spec.detector == "knn":
+        if spec.neighbours is None:
+            raise ValueError("the kNN needs --neighbours: a number, or matched:k")
+        pool = dataset.load_split(config["dir"] / "pool.csv", config)
+        return KNNDetector(Space(random_forest.vocabulary(pool, config), pool), config["benign"], spec.neighbours)
     raise NotImplementedError(f"detector {spec.detector!r} is not implemented")
 
 
@@ -119,15 +128,15 @@ def check_spec(spec: RunSpec, detector_name: str) -> None:
         raise ValueError("k = all is only meaningful for the Random Forest and the Isolation Forest")
     if detector_name == "random_forest" and 0 in spec.k_values:
         raise ValueError("the Random Forest starts at k = 1")
-    if detector_name == "isolation_forest" and spec.k_values != (None,):
-        raise ValueError("the Isolation Forest runs at k = all only")
+    if detector_name in ("isolation_forest", "knn") and spec.k_values != (None,):
+        raise ValueError(f"the {detector_name} runs at k = all only")
     if spec.selection is not None and (spec.selection not in SELECTIONS or (spec.delay is None and spec.selection == "score")):
         raise ValueError(f"selection {spec.selection!r}: `random` or `score`, and `score` needs a stream (--delay)")
 
 
 def selection_of(spec: RunSpec, detector_name: str) -> str | None:
     """How the Examples are chosen: None for the forests (the whole memory), else the spec's choice, `score` in a stream by default."""
-    if detector_name in FORESTS:
+    if detector_name in WHOLE_MEMORY:
         return None
     if spec.selection is not None:
         return spec.selection
@@ -295,6 +304,7 @@ def redo_errors(run_dir: Path) -> Path:
         # A run made before the compact record existed read the values in full.
         record=fields.get("record", "full"),
         selection=fields.get("selection"),
+        neighbours=fields.get("neighbours"),
     )
     config = dataset.load_config(spec.dataset)
     flows = dataset.load_split(config["dir"] / "splits" / f"{spec.split}.csv", config)

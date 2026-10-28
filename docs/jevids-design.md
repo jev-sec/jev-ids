@@ -14,7 +14,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 0                                 | Done, commit `3b011d8`                                                  |
 | Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
-| Stage 3                                 | `Selector` coded; kNN and line 2 to come                                |
+| Stage 3                                 | `Selector` and kNN coded; line 2 to come                                |
 | Stages 4 to 6 below                     | Not started                                                             |
 
 ## Goal
@@ -192,6 +192,13 @@ dynamic k changes the distribution of p_attack.
 | kNN              | The same neighbours the `Selector` finds, majority vote; if it matches Jev IDS, Jev adds nothing                                                          |
 
 A forest fitted once on the whole pool would see later pool Flows (the future) and never the feedback; a reviewer could point at either.
+
+The kNN was fixed on 2026-10-28, before any kNN result (`jev_ids/detectors/knn.py`): the K nearest Flows of the whole visible memory, in
+the `Selector`'s space, vote; the most frequent Category wins, a tie going to the Category of the nearest tied neighbour; p_attack is the
+share of neighbours that are attacks. A vote among the `Selector`'s own Examples was rejected because with k Examples per Category it
+always ties. Two K are run and both reported: K = 4 (`--neighbours 4`) and K = the number of Examples the `Selector` gives Jev at k = 4
+for the same memory (`--neighbours matched:4`, about 12 on the pilot), so both read the same number of Flows. One seed: the vote is
+deterministic.
 
 ### Rejected or deferred
 

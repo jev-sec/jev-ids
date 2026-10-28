@@ -47,7 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     runner = commands.add_parser("run", help="run one detector over one split")
     runner.add_argument("--dataset", required=True, type=Path, help="the card: data/<name>/dataset.json")
-    runner.add_argument("--detector", required=True, help="jev, llm:deepseek, llm:openai, llm:gemini, random_forest or isolation_forest")
+    runner.add_argument(
+        "--detector", required=True, help="jev, llm:deepseek, llm:openai, llm:gemini, random_forest, isolation_forest or knn"
+    )
     runner.add_argument("--split", required=True, help="internal, pilot, smoke, ...")
     runner.add_argument(
         "--k",
@@ -72,6 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=run.SELECTIONS,
         help="Examples of a stream: by score and MMR (score, the default) or at random (random, line 0)",
     )
+    runner.add_argument("--neighbours", help="K of the kNN: a number, or matched:k for as many as the Selector gives Jev at k")
     runner.set_defaults(handler=run_command)
 
     redoer = commands.add_parser("redo-errors", help="complete a run in place: its error rows again, its missing flows for the first time")
@@ -117,6 +120,7 @@ def run_command(args: argparse.Namespace) -> None:
         jobs=args.jobs,
         record=args.record,
         selection=args.selection,
+        neighbours=args.neighbours,
     )
     run.run_from_spec(spec)
 

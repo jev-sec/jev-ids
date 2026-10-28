@@ -298,3 +298,15 @@ def test_a_stream_run_gives_jev_the_selector_s_examples(card: Path) -> None:
     assert [n for _, n in detector.calls] == [3, 3, 3]
     config_json = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     assert (config_json["spec"]["selection"], config_json["selection"]) == (None, "score")
+
+
+def test_the_knn_needs_its_neighbours_and_the_whole_memory(card: Path) -> None:
+    config = dataset.load_config(card)
+    spec = run.RunSpec("knn", card, "smoke", (None,), (0,), delay=1, neighbours="matched:4")
+    detector = run.build_detector(spec, config)
+    assert (detector.name, detector.model, detector.record) == ("knn", "knn-matched-4", "full")
+    assert run.selection_of(spec, "knn") is None
+    with pytest.raises(ValueError, match="--neighbours"):
+        run.build_detector(replace(spec, neighbours=None), config)
+    with pytest.raises(ValueError, match="k = all"):
+        run.check_spec(replace(spec, k_values=(4,)), "knn")
