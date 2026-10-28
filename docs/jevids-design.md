@@ -14,7 +14,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 0                                 | Done, commit `3b011d8`                                                  |
 | Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
-| Stage 3                                 | `Selector` and kNN coded; line 2 to come                                |
+| Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stages 4 to 6 below                     | Not started                                                             |
 
 ## Goal
@@ -366,6 +366,31 @@ line 0 (p = 0.29, 0.18, 0.18), not significant on any seed; known attacks 0 to 0
 Of the 26 discordant Flows over the three seeds, 24 are BENIGN (19 newly flagged, 5 no longer flagged) and 2 DoS (one each way). The
 three seeds point the same way, so a small loss of precision from rounding is plausible, but the pilot cannot tell it from noise; the
 paper split in stage 6, where the ablation removes the compact record, will.
+
+### Line 2: `Selector` and the kNN baseline (pilot, D = 1)
+
+Jev, k = 4 by score and MMR, compact record, seeds 0 to 2, run at commit `2c77f04`
+(`results/design-cicids2017/20261028T183725.833595Z-cicids2017-jev-pilot`). The two kNN runs, seed 0, at commit `7654808`, which only
+let the kNN run at k = all: K = 4 in `20261028T184511.643475Z-cicids2017-knn-pilot`, K matched in `20261028T184511.687748Z-cicids2017-knn-pilot`.
+
+| Detector                    | F1            | Precision | Recall | Novel recall | Novel, first contact | False alarms | Missed | PR-AUC | Input tokens per request | Cost per 1M Flows |
+| --------------------------- | ------------- | --------- | ------ | ------------ | -------------------- | ------------ | ------ | ------ | ------------------------ | ----------------- |
+| Line 1: Jev, k = 4 random   | 0.937 ± 0.011 | 0.883     | 0.998  | 1.000        | 9 of 9               | 20.0         | 0.3    | 0.991  | 5,443                    | 229 USD           |
+| Line 2: Jev, k = 4 Selector | 0.970 ± 0.002 | 0.942     | 1.000  | 1.000        | 9 of 9               | 9.3          | 0      | 0.995  | 5,697                    | 239 USD           |
+| kNN, K = 4                  | 0.944         | 1.000     | 0.894  | 0.708        | 1 of 3               | 0            | 16     | 0.974  | none                     | ~0                |
+| kNN, K matched (12.5)       | 0.898         | 1.000     | 0.815  | 0.458        | 1 of 3               | 0            | 28     | 0.977  | none                     | ~0                |
+
+The `Selector` halved Jev's false alarms (20.0 to 9.3; per seed 22 to 10, 16 to 9, 22 to 9) and missed no attack. McNemar of line 1
+against line 2, per seed, all Flows: 1 to 13 (p = 0.002), 3 to 10 (p = 0.09) and 2 to 16 (p = 0.001) for line 2; known attacks one
+discordant Flow, for line 2; novel attacks none. The spread over seeds fell from 0.011 to 0.002, as expected once the Examples no longer
+depend on the seed. A request carries the same 12.5 Examples on average but 4.7 % more tokens, because the chosen records are longer
+than random ones: 239 against 229 USD per 1M Flows.
+
+The kNN does not explain Jev's result. It raises no false alarm but misses attacks, most of them novel: with K = 4 it misses 16 attacks
+and 14 of the 48 novel Flows; with as many neighbours as Jev reads it misses 28 and 26. Jev (seed 0) against the kNN, McNemar: K = 4,
+all Flows 16 to 10 for Jev (p = 0.33), novel 14 to 0 (p = 0.0001); K matched, all Flows 28 to 10 for Jev (p = 0.005), novel 26 to 0
+(p = 3e-8). The matched K gives every request's neighbour count exactly (12.51 on average, as Jev's Examples). On the pilot the plain
+K = 4 kNN is as good as Jev overall, and its advantage is entirely on BENIGN, as the Random Forest's was in line 0.
 
 ## Changes after results
 
