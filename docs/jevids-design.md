@@ -15,7 +15,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
-| Stage 4                                 | `KController` coded; line 3 to come                                     |
+| Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
 | Stages 5 and 6 below                    | Not started                                                             |
 
 ## Goal
@@ -402,6 +402,27 @@ and 14 of the 48 novel Flows; with as many neighbours as Jev reads it misses 28 
 all Flows 16 to 10 for Jev (p = 0.33), novel 14 to 0 (p = 0.0001); K matched, all Flows 28 to 10 for Jev (p = 0.005), novel 26 to 0
 (p = 3e-8). The matched K gives every request's neighbour count exactly (12.51 on average, as Jev's Examples). On the pilot the plain
 K = 4 kNN does not differ significantly from Jev overall, and its only advantage is on BENIGN, as the Random Forest's was in line 0.
+
+### Line 3: `KController` (pilot, D = 1)
+
+Jev, mirrored AIMD from k₀ = 1 with the `Selector`, compact record, seeds 0 to 2, run at commit `a4a4e04`
+(`results/design-cicids2017/20261028T185053.038976Z-cicids2017-jev-pilot`).
+
+| Detector                         | F1            | Precision | Recall | Novel recall | Novel, first contact | False alarms | Missed | PR-AUC | Examples per request | Input tokens per request | Cost per 1M Flows |
+| -------------------------------- | ------------- | --------- | ------ | ------------ | -------------------- | ------------ | ------ | ------ | -------------------- | ------------------------ | ----------------- |
+| Line 2: Jev, k = 4 Selector      | 0.970 ± 0.002 | 0.942     | 1.000  | 1.000        | 9 of 9               | 9.3          | 0      | 0.995  | 12.5                 | 5,697                    | 239 USD           |
+| Line 3: Jev, AIMD k and Selector | 0.961 ± 0.006 | 0.925     | 1.000  | 1.000        | 9 of 9               | 12.3         | 0      | 0.998  | 3.6                  | 2,673                    | 112 USD           |
+
+The `KController` cut the Examples per request from 12.5 to 3.6 and the cost by 53 % (239 to 112 USD per 1M Flows) while every attack
+was still caught, novel ones included. False alarms rose from 9.3 to 12.3 (per seed 10 to 14, 9 to 13, 9 to 10). McNemar of line 2
+against line 3, per seed, all Flows: 9 to 5, 6 to 2 and 5 to 4 for line 2 (p = 0.42, 0.29, 1.0), not significant on any seed; no
+discordant known or novel attack. Against the Random Forest (seed 0) line 3 is 8 to 14 overall (p = 0.29) and 6 to 0 on novel attacks
+(p = 0.031); against the kNN with K = 4, 16 to 14 overall (p = 0.86) and 14 to 0 on novel attacks (p = 0.0001).
+
+The controller's path: BENIGN rose up to k = 4.6 after false alarms and came back down; DDoS rose to 8 and stayed there (7.6 at the end
+of seed 0), because with one Example Jev named 15 DDoS Flows DoS (5 per seed, none in line 2) while still calling them attacks; DoS,
+BruteForce and Botnet never left 1. The controller reacts to the Category, so a confusion between two attack Categories costs tokens
+without changing the Verdict.
 
 ## Changes after results
 
