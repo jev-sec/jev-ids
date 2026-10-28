@@ -18,11 +18,10 @@ import time
 from collections.abc import Sequence
 from typing import Any
 
-import numpy as np
 from sklearn.ensemble import IsolationForest  # pyright: ignore[reportMissingTypeStubs]
 
 from jev_ids.dataset import Flow
-from jev_ids.detectors.random_forest import Vocabulary, feature_vector
+from jev_ids.detectors.random_forest import Encoder, Vocabulary
 
 N_ESTIMATORS = 100
 RANDOM_STATE = 0
@@ -34,15 +33,18 @@ class IsolationForestDetector:
     name = "isolation_forest"
     prompt_hash = None  # the forest reads no prompt
 
-    def __init__(self, vocabulary: Vocabulary, benign: str) -> None:
+    def __init__(self, vocabulary: Vocabulary, benign: str, jobs: int = 1) -> None:
         """Keep the encoding and the benign label; fitting waits for `predict`.
 
         Args:
             vocabulary: the symbolic values of the pool (see `random_forest.vocabulary`).
             benign: the card's benign category, the only one the forest is fitted on.
+            jobs: CPU cores a fit may use, scikit-learn's `n_jobs` (-1 for all); the fixed random_state makes the forest the same for any
+                value.
         """
-        self.vocabulary = vocabulary
+        self.encoder = Encoder(vocabulary)
         self.benign = benign
+        self.jobs = jobs
         self.model = f"sklearn-isolation-forest-{N_ESTIMATORS}"
         self.fit_count = 0
         # Fitted once per Examples list (by identity), as the Random Forest is, so every rep of a cell reuses the same forest.
@@ -61,15 +63,15 @@ class IsolationForestDetector:
             benign = [example for example in examples if example.category == self.benign]
             if not benign:
                 raise ValueError("the Isolation Forest needs benign Examples to learn from: run it at k = all")
-            matrix = np.asarray([feature_vector(example, self.vocabulary) for example in benign], dtype=float)
-            self._forest = IsolationForest(n_estimators=N_ESTIMATORS, random_state=RANDOM_STATE)
+            matrix = self.encoder.matrix(benign)
+            self._forest = IsolationForest(n_estimators=N_ESTIMATORS, random_state=RANDOM_STATE, n_jobs=self.jobs)
             started = time.perf_counter()
             self._forest.fit(matrix)
             self._train_time_ms = (time.perf_counter() - started) * 1000
             self._train_flows = len(benign)
             self._fitted_on_examples_id = id(examples)
             self.fit_count += 1
-        matrix = np.asarray([feature_vector(flow, self.vocabulary)], dtype=float)
+        matrix = self.encoder.matrix([flow])
         started = time.perf_counter()
         anomaly_score = -float(self._forest.score_samples(matrix)[0])
         return {

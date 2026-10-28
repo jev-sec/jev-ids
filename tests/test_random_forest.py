@@ -58,3 +58,23 @@ def test_fit_rejects_zero_shot() -> None:
     detector = rf.RandomForestDetector(VOCABULARY, "normal")
     with pytest.raises(ValueError, match="k >= 1"):
         detector.predict(TRAIN[0], [])
+
+
+def test_the_encoder_encodes_each_flow_once_and_jobs_leave_the_forest_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    encoder = rf.Encoder(VOCABULARY)
+    first = encoder.matrix(TRAIN)
+    assert first.tolist() == [rf.feature_vector(flow, VOCABULARY) for flow in TRAIN]
+    encoded: list[int] = []
+    original = rf.feature_vector
+
+    def counted(flow: Flow, vocabulary: rf.Vocabulary) -> list[float]:
+        encoded.append(flow.row_id)
+        return original(flow, vocabulary)
+
+    monkeypatch.setattr(rf, "feature_vector", counted)
+    assert encoder.matrix(TRAIN[::-1]).tolist() == first[::-1].tolist()
+    assert encoded == []
+    monkeypatch.undo()
+    under_test = flow(99, "dos", "tcp", "5")
+    answers = [rf.RandomForestDetector(VOCABULARY, "normal", jobs).predict(under_test, TRAIN) for jobs in (1, 2)]
+    assert answers[0]["p_attack"] == answers[1]["p_attack"]

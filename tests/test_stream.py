@@ -121,11 +121,12 @@ def test_no_attack_name_reaches_a_request(tmp_path: Path) -> None:
         assert not any(name in body for name in NAMES.values() if name != "BENIGN")
 
 
-def test_a_forest_gets_the_whole_memory_refitted_every_hundred_steps(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(stream, "REFIT_EVERY", 2)
+def test_a_forest_gets_the_whole_memory_at_every_step(tmp_path: Path) -> None:
     recorder, rows = run_cell(tmp_path, k=None)
     lists = [examples for _, examples in recorder.calls]
-    assert lists[0] == lists[1] != lists[2] == lists[3]
+    # Step 0 ends at minute 3: normal 0 to 2 and dos 20; step 1 adds normal 3 and the returned Flow 101.
+    assert {e.row_id for e in lists[0]} == {0, 1, 2, 20}
+    assert {e.row_id for e in lists[1]} == {0, 1, 2, 3, 20, 101}
     # Step 2 ends at minute 6: normal 0 to 5, dos 20, probe 22, and Flows 101 and 102 came back.
     assert {e.row_id for e in lists[2]} == {0, 1, 2, 3, 4, 5, 20, 22, 101, 102}
     assert [row["n_examples"] for row in rows] == [len(examples) for examples in lists]

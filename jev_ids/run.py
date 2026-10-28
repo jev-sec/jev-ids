@@ -56,6 +56,8 @@ class RunSpec:
         reps: how often each (k, seed) cell is repeated, for stability.
         model_id: the provider model, for the LLM detectors; None means default.
         results_dir: where run directories are created.
+        jobs: CPU cores each forest fit may use (-1 for all); the forests come out the same for any value, so it is not part of the
+            experiment.
         delay: the feedback delay D in steps for a stream run (docs/jevids-design.md, D4); None judges every Flow against one fixed draw
             of Examples, the protocol of the first paper.
     """
@@ -69,6 +71,7 @@ class RunSpec:
     model_id: str | None = None
     results_dir: Path = RESULTS_DIR
     delay: int | None = None
+    jobs: int = 1
 
 
 def load_prompt(path: Path) -> dict[str, Any]:
@@ -93,7 +96,7 @@ def build_detector(spec: RunSpec, config: Config) -> Detector:
         # The one-hot vocabulary comes from the whole pool, never from the Examples, and both forests encode a Flow the same way.
         pool = dataset.load_split(config["dir"] / "pool.csv", config)
         forest = RandomForestDetector if spec.detector == "random_forest" else IsolationForestDetector
-        return forest(random_forest.vocabulary(pool, config), config["benign"])
+        return forest(random_forest.vocabulary(pool, config), config["benign"], spec.jobs)
     raise NotImplementedError(f"detector {spec.detector!r} is not implemented")
 
 

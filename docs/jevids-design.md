@@ -145,12 +145,12 @@ dynamic k changes the distribution of p_attack.
 
 ### D10. Baselines see what Jev IDS sees
 
-| Baseline         | How                                                                                                       |
-| ---------------- | --------------------------------------------------------------------------------------------------------- |
-| Jev, random k    | Stage 1: Examples drawn at random from the visible memory, k = 4 for every Category                       |
-| Random Forest    | Refitted on the visible memory every 100 Flows, so it gets the same past and the same feedback as Jev IDS |
-| Isolation Forest | Refitted on the benign Flows of the visible memory every 100 Flows                                        |
-| kNN              | The same neighbours the `Selector` finds, majority vote; if it matches Jev IDS, Jev adds nothing          |
+| Baseline         | How                                                                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jev, random k    | Stage 1: Examples drawn at random from the visible memory, k = 4 for every Category                                                                       |
+| Random Forest    | Refitted on the visible memory at every Flow, so it gets the same past and the same feedback as Jev IDS; one seed, since the forest does not depend on it |
+| Isolation Forest | Refitted on the benign Flows of the visible memory at every Flow; one seed                                                                                |
+| kNN              | The same neighbours the `Selector` finds, majority vote; if it matches Jev IDS, Jev adds nothing                                                          |
 
 A forest fitted once on the whole pool would see later pool Flows (the future) and never the feedback; a reviewer could point at either.
 
@@ -255,4 +255,16 @@ subset Jev at k = 8 beat it in 18 discordant pairs to 0 (McNemar p = 7.6e-6 per 
 
 ## Changes after results
 
-None yet.
+### 2026-10-28: the forests refit at every Flow, not every 100
+
+Seen: line 0 with a refit every 100 Flows gave the Random Forest recall 0.093 (F1 0.170) and the Isolation Forest recall 0.331 (F1 0.483)
+against Jev's 0.998. On the 300-Flow pilot, 100 steps span about a day and a half of capture while each attack lasts minutes, so every
+refit came before the attack it should have learned: refit at step 0 (Monday, BENIGN only) missed all 32 BruteForce Flows, at step 100
+(Tuesday evening) all 65 DoS, at step 200 (Wednesday evening) all 37 PortScan and 3 Botnet.
+
+Changed: the forests refit on the memory at every Flow, the same past Jev sees. This is the forests' best case, not a deployable one: a
+fit takes up to 17.5 s on one core at 90,000 Flows, far slower than traffic arrives, while Jev changes only the Examples of a request.
+`train_time_ms` in every row reports that cost. Two changes make it affordable and leave every prediction the same: each Flow is encoded
+once (`Encoder`), and a fit may use several cores (`--jobs`, -1 for all by default; one fit on the whole pool went from 14.3 s to 3.4 s
+with identical predictions). The forests run with one seed, because seeds 0 to 2 gave identical rows: their random_state is fixed and
+the memory does not depend on the seed.

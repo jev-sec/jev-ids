@@ -10,8 +10,8 @@ In reading order:
 
 The design is docs/jevids-design.md, D3 and D4. Step t judges the t-th Flow to end. The pool Flows a step may use are those that ended
 before the Flow under test; a judged Flow comes back with its true Category D steps later, so with D = 1 the Flow judged at step t is
-in the memory at step t + 1. Feedback is complete: every judged Flow comes back, missed attacks included. The forests see the same memory,
-refitted every REFIT_EVERY steps, so they get the same past and the same feedback as Jev. Attack names stay out of every request: the
+in the memory at step t + 1. Feedback is complete: every judged Flow comes back, missed attacks included. The forests are refitted on the
+memory at every step, so they get the same past and the same feedback as Jev. Attack names stay out of every request: the
 memory holds Flows, which carry the Category only, and the names read from the split serve the `first_contact` field alone.
 """
 
@@ -25,9 +25,6 @@ from typing import Any, Protocol
 
 from jev_ids.dataset import Flow
 from jev_ids.records import Prediction, append_prediction, complete_prediction
-
-# How often, in steps, the forests are refitted on the memory; a refit per Flow would cost minutes per step on the whole pool.
-REFIT_EVERY = 100
 
 
 class Predictor(Protocol):
@@ -124,18 +121,16 @@ def stream_cell(
 ) -> None:
     """One cell: every Flow in stream order, its Examples from the memory, one call and one appended row, then the progress line.
 
-    `cell["k"]` is k Examples per Category for Jev, or None for a forest, which gets the whole memory, refitted every REFIT_EVERY steps.
+    `cell["k"]` is k Examples per Category for Jev, or None for a forest, which gets the whole memory and refits on it at every step; a
+    refit every 100 steps was tried first and left the forests days behind on the pilot (docs/jevids-design.md, "Changes after results").
     A novel attack's row says whether it met its attack name for the first time (`first_contact`): no Flow of that name had come back yet.
     """
     errors = 0
-    forest_examples: list[Flow] = []
     for step, flow in enumerate(in_stream_order(flows)):
         if cell["k"] is not None:
             examples = random_examples(memory, flow, step, cell["k"], cell["seed"])
         else:
-            if step % REFIT_EVERY == 0:
-                forest_examples = memory.everything(step, end_of(flow))
-            examples = forest_examples
+            examples = memory.everything(step, end_of(flow))
         fields = {**cell, "step": step, "n_examples": len(examples), "first_contact": memory.first_contact(flow, step)}
         prediction = complete_prediction(detector.predict(flow, examples), flow, fields)
         append_prediction(run_dir, prediction)

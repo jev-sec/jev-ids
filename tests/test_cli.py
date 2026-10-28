@@ -30,7 +30,9 @@ def test_run_builds_a_spec_from_the_arguments(monkeypatch: pytest.MonkeyPatch) -
     argv = ["run", "--dataset", card, "--detector", "random_forest", "--split", "smoke"]
     argv += ["--k", "1,all", "--seeds", "1", "--reps", "3", "--model", "m", "--results-dir", "results/paper"]
     assert cli.main(argv) == 0
-    expected = run.RunSpec("random_forest", Path(card), "smoke", (1, None), (1,), reps=3, model_id="m", results_dir=Path("results/paper"))
+    expected = run.RunSpec(
+        "random_forest", Path(card), "smoke", (1, None), (1,), reps=3, model_id="m", results_dir=Path("results/paper"), jobs=-1
+    )
     assert seen == [expected]
     argv = ["run", "--dataset", card, "--detector", "jev", "--split", "pilot"]
     assert cli.main(argv) == 0

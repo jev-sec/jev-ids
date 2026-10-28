@@ -192,11 +192,11 @@ def test_build_detector_knows_the_five_names(card: Path) -> None:
     forest = run.build_detector(run.RunSpec("random_forest", card, "smoke", (1,), (0,)), config)
     assert isinstance(forest, RandomForestDetector)
     # Feature `b` sits at index 1; every TRAIN attribute equals its row index.
-    assert forest.vocabulary == {1: ("0", "1", "2", "3", "4", "5")}
+    assert forest.encoder.vocabulary == {1: ("0", "1", "2", "3", "4", "5")}
     assert forest.benign == "normal"
     isolation = run.build_detector(run.RunSpec("isolation_forest", card, "smoke", (None,), (0,)), config)
     assert isinstance(isolation, IsolationForestDetector)
-    assert (isolation.vocabulary, isolation.benign) == (forest.vocabulary, "normal")
+    assert (isolation.encoder.vocabulary, isolation.benign) == (forest.encoder.vocabulary, "normal")
     nsl_kdd = dataset.load_config(NSL_KDD)
     jev_spec = run.RunSpec("jev", NSL_KDD, "smoke", (0,), (0,))
     judge = run.build_detector(jev_spec, nsl_kdd)
