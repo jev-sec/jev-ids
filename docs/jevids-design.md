@@ -174,7 +174,7 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 | Stage            | What changes                                                                                                                                                                                   | Proof                                                                                                                    | Output                                   |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | 0. Data          | Cut per (day, attack name) in `scripts/prepare_cicids2017.py`; `Flow` gets its end time; splits redrawn with seed 20261027; a validation stream from the pool; `DATASET=cicids2017` by default | Tests: every day has benign Flows in the test file; pool before test within each (day, attack name); caps respected      | New pool, test, splits and `SOURCE.json` |
-| 1. Stream        | `Memory` and the stream loop; random Examples, k = 4                                                                                                                                           | Tests: the memory never returns a Flow from the future; a Flow enters exactly at t + D; no attack name reaches a request | Line 0: Jev, RF, IF                      |
+| 1. Stream        | `Memory` and the stream loop; random Examples, k = 4; forests refitted on the memory at every Flow                                                                                             | Tests: the memory never returns a Flow from the future; a Flow enters exactly at t + D; no attack name reaches a request | Line 0: Jev, RF, IF (done)               |
 | 2. Record        | 4 significant digits                                                                                                                                                                           | Test: large and small values keep their order of magnitude                                                               | Line 1, with tokens per Flow             |
 | 3. `Selector`    | Score and MMR, k = 4                                                                                                                                                                           | Test: two identical Flows are never chosen together                                                                      | Line 2 and the kNN baseline              |
 | 4. `KController` | Mirrored AIMD                                                                                                                                                                                  | Tests: error, success and absent Category                                                                                | Line 3                                   |
@@ -199,8 +199,9 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 - Attack names never reach a request (`CONTEXT.md`); the memory keeps them for analysis only, and Examples carry the Category.
 - The Jev template asks two questions about `flows.under_test`: `is_attack` (`noul`, gives p_attack) and `category` (`choice`, gives the
   Category and a confidence). `request_body` in `jev_ids/detectors/jev.py` fills `flows.under_test` and `examples`.
-- A failed call is a row with `error`, counted as normal (fail-open, `docs/protocol.md`). Proposed: it enters the memory with its true
-  label, difficulty 0.5 and no Jev answer, and the `KController` ignores it. To confirm in stage 1.
+- A failed call is a row with `error`, counted as normal (fail-open, `docs/protocol.md`). Since stage 1 it enters the memory like any
+  judged Flow, with its true Category, because `Memory.add` stores the Flow and its row whatever the row holds. Still to do: the
+  `Selector` gives it difficulty 0.5 (no Jev answer, stage 3) and the `KController` ignores it (stage 4). Line 0 had no failed call.
 - Each Example costs about 490 input tokens on CIC-IDS2017 before rounding: (25,312 − 1,654) / 48, from the pilot's mean input tokens at
   k = 8 and k = 0.
 - In stage 1, seeds drive the random Examples. From stage 3 on the `Selector` is deterministic, and so are the forests (random_state 0,
@@ -215,6 +216,36 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
   pool, so a run over it must keep a Flow from being its own Example; the clock rule of D4 already does this, because a Flow only sees
   pool Flows that ended before it.
 - Run every command through make or with `UV_PROJECT_ENVIRONMENT=$HOME/.venvs/jev-ids`, so `uv run` does not create `.venv` in the repo.
+- Commit every change, documents included, before a run: `code_commit` in `config.json` ends in `-dirty` whenever the tree has an
+  uncommitted change, as the line 0 forests did (an uncommitted status line of this file; the code was `b8a0330`'s).
+
+### State of the code after stage 1
+
+- `jev_ids/stream.py`: `in_stream_order` (D3), `Memory` (D4: pool Flows by Category sorted by end, judged Flows with their rows,
+  `returned(step)` = the first `step − D + 1` judged Flows, `visible(category, step, now)`, `everything`, `first_contact`),
+  `random_examples` (line 0: k per Category, or all when fewer, seeded by seed, row_id and Category), `split_names` and `stream_cell`.
+  The `Selector` (stage 3) replaces `random_examples`; the `KController` (stage 4) decides the k it is called with, per Category.
+- `jev_ids/run.py`: `RunSpec.delay` (None keeps the first paper's protocol, one fixed draw per cell) and `RunSpec.jobs`. With a delay,
+  `execute` builds a fresh `Memory` per (k, seed, rep) cell and calls `stream_cell`. `redo-errors` refuses a stream run, because a Flow
+  judged again would see another past than its neighbours did: a stream run with errors is run again from the start.
+- `jev_ids/detectors/random_forest.py`: `Encoder` encodes each Flow once for both forests; `jobs` is scikit-learn's `n_jobs`.
+- CLI: `jev-ids run ... --delay D` streams the split; `--jobs N` sets the cores of a forest fit (default -1, all; the forests are the same
+  for any value). Line 0 was run with:
+
+  ```
+  jev-ids run --dataset data/cicids2017/dataset.json --split pilot --delay 1 --results-dir results/design-cicids2017 \
+    --detector jev --k 4 --seeds 0,1,2
+  jev-ids run ... --detector random_forest --k all --seeds 0
+  jev-ids run ... --detector isolation_forest --k all --seeds 0
+  ```
+
+- Every stream row adds `delay`, `step`, `n_examples` (Examples actually sent, which varies per Flow) and `first_contact` (True or False
+  for a novel attack whose name is in the split's `raw_label`, None otherwise) to the fields of `records.complete_prediction`.
+- `jev-ids metrics` groups by (dataset, detector, model, split, delay, k) and adds `recall_novel_first_contact` and
+  `recall_novel_after_feedback`. `jev-ids compare --k-a 4 --k-b all` pairs Jev with a forest; the forests have seed 0 only, so pairs
+  exist for Jev's seed 0 only.
+- Run results live in `results/design-cicids2017/`, one directory per run; `responses.jsonl` is git-ignored. The forest runs with a
+  refit every 100 Flows were not kept; their numbers are in "Changes after results".
 
 ## Data facts behind the decisions
 
