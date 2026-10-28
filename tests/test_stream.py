@@ -137,12 +137,13 @@ def test_a_choose_hook_replaces_the_random_draw(tmp_path: Path) -> None:
     memory = stream.Memory(POOL, CATEGORIES, 1, NAMES)
     seen: list[int] = []
 
-    def choose(memory: stream.Memory, flow: Flow, step: int) -> list[Flow]:
+    def choose(memory: stream.Memory, flow: Flow, step: int) -> tuple[list[Flow], dict[str, Any]]:
         seen.append(step)
-        return memory.visible("probe", step, stream.end_of(flow))
+        return memory.visible("probe", step, stream.end_of(flow)), {"hook": step}
 
     stream.stream_cell(tmp_path, recorder, memory, FLOWS, {"k": 4, "seed": 0, "repetition": 0, "delay": 1}, choose)
     assert seen == [0, 1, 2, 3]
     # Only the probe Flow, which ends at minute 5, and only for the Flows ending after it.
     assert [[e.row_id for e in examples] for _, examples in recorder.calls] == [[], [], [22], [22]]
     assert memory.rows[101]["category_true"] == "normal"
+    assert [row["hook"] for row in records.read_predictions(tmp_path)] == [0, 1, 2, 3]

@@ -53,14 +53,16 @@ def test_metrics_prints_one_csv_over_every_run_given(tmp_path: Path, capsys: pyt
     records.append_prediction(tmp_path / "b", other)
     assert cli.main(["metrics", str(tmp_path / "a"), str(tmp_path / "b")]) == 0
     lines = capsys.readouterr().out.splitlines()
-    assert lines[0].startswith("dataset,detector,model,split,delay,record,selection,k,cells,flows,predictions,f1_mean,")
+    assert lines[0].startswith("dataset,detector,model,split,delay,record,selection,control,k,cells,flows,predictions,f1_mean,")
     assert lines[0].endswith(",cost_usd_per_1m,latency_ms_mean,latency_ms_median,latency_ms_p95,duration_mean")
     assert len(lines) == 3
     # After recall_known come recall_dos, recall_known_dos and recall_novel_dos (the first run's only attack is a known dos), the alert
     # counts, then the two areas, which a single-class cell leaves empty, then the error rate; the second run has no attack, so its
     # category columns stay empty.
-    assert lines[1] == "test,jev,m,internal,,full,random,1,1,1,1,1.0,1.0,1.0,,1.0,,,1.0,1.0,,0.0,0.0,,,0.0,,100.0,10.0,,,,,500.0,500.0,,"
-    assert lines[2] == "test,random_forest,m,internal,,full,random,1,1,1,1,,,,,,,,,,,0.0,0.0,,,0.0,,,,,,,,500.0,500.0,,2.0"
+    assert (
+        lines[1] == "test,jev,m,internal,,full,random,fixed,1,1,1,1,1.0,1.0,1.0,,1.0,,,1.0,1.0,,0.0,0.0,,,0.0,,100.0,10.0,,,,,500.0,500.0,,"
+    )
+    assert lines[2] == "test,random_forest,m,internal,,full,random,fixed,1,1,1,1,,,,,,,,,,,0.0,0.0,,,0.0,,,,,,,,500.0,500.0,,2.0"
     assert cli.main(["metrics", str(tmp_path / "empty")]) == 0
     assert capsys.readouterr().out == ""
 

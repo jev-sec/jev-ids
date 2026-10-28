@@ -15,7 +15,8 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
-| Stages 4 to 6 below                     | Not started                                                             |
+| Stage 4                                 | `KController` coded; line 3 to come                                     |
+| Stages 5 and 6 below                    | Not started                                                             |
 
 ## Goal
 
@@ -103,6 +104,16 @@ Examples used for c = ceil(k_c), or every visible Example of c when fewer exist.
 The 1/k_c step replaced a threshold m of "correct appearances per batch" when batches were dropped (D8), and removes one parameter. The
 controller reacts when the label arrives, at t + D, not when the Flow is judged. BENIGN has its own k like every other Category. A
 sensitivity check with β ∈ {1.5, 2, 3} shows the result does not hinge on one value.
+
+Fixed on 2026-10-28, before line 3 was run (`jev_ids/controller.py`):
+
+- An error is `category_pred` differing from the true Category, a missing Category answer included; a row with `error` is ignored.
+- Every stream cell starts a fresh controller at k₀ = 1 for every Category. At each step the rows that came back since the last step
+  (`Memory.returned`, the first t − D + 1) update k in the order they were judged, then the `Selector` gives ceil(k_c) Examples per
+  Category, or fewer when a Category has fewer distinct candidates.
+- Every row carries `k_by_category`, the k of each Category before the ceiling, so the controller's path can be read back.
+- `jev-ids run --control aimd --k 1` runs it; `--k` is then k₀ and must be 1, and the selection must be `score`. `control` (`fixed` or
+  `aimd`) is written in `config.json` and in every row, `fixed` for rows written before it existed, and `jev-ids metrics` groups by it.
 
 ### D6. `Selector`: one score and MMR
 
@@ -390,7 +401,7 @@ The kNN does not explain Jev's result. It raises no false alarm but misses attac
 and 14 of the 48 novel Flows; with as many neighbours as Jev reads it misses 28 and 26. Jev (seed 0) against the kNN, McNemar: K = 4,
 all Flows 16 to 10 for Jev (p = 0.33), novel 14 to 0 (p = 0.0001); K matched, all Flows 28 to 10 for Jev (p = 0.005), novel 26 to 0
 (p = 3e-8). The matched K gives every request's neighbour count exactly (12.51 on average, as Jev's Examples). On the pilot the plain
-K = 4 kNN is as good as Jev overall, and its advantage is entirely on BENIGN, as the Random Forest's was in line 0.
+K = 4 kNN does not differ significantly from Jev overall, and its only advantage is on BENIGN, as the Random Forest's was in line 0.
 
 ## Changes after results
 

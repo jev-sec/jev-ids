@@ -36,8 +36,9 @@ class Predictor(Protocol):
     def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]: ...  # noqa: D102  documented by each Detector
 
 
-# What gives a Flow its Examples at a step: the `Selector` since stage 3; None in `stream_cell` falls back to the random draw of line 0.
-Choose = Callable[["Memory", Flow, int], list[Flow]]
+# What gives a Flow its Examples at a step, with any extra fields for its row: the `Selector` since stage 3 (no extra field), with the
+# `KController` since stage 4 (the k of every Category); None in `stream_cell` falls back to the random draw of line 0.
+Choose = Callable[["Memory", Flow, int], tuple[list[Flow], dict[str, Any]]]
 
 
 def end_of(flow: Flow) -> datetime:
@@ -133,17 +134,19 @@ def stream_cell(  # noqa: PLR0913, PLR0917 - the cell's fields plus the hook tha
     `cell["k"]` is k Examples per Category for Jev, or None for a forest, which gets the whole memory and refits on it at every step; a
     refit every 100 steps was tried first and left the forests days behind on the pilot (docs/jevids-design.md, "Changes after results").
     A novel attack's row says whether it met its attack name for the first time (`first_contact`): no Flow of that name had come back yet.
-    `choose`, when given, replaces the random draw for Jev (the `Selector`, stage 3).
+    `choose`, when given, replaces the random draw for Jev (the `Selector`, stage 3, and its `KController`, stage 4) and may add fields
+    to the row.
     """
     errors = 0
     for step, flow in enumerate(in_stream_order(flows)):
+        extra: dict[str, Any] = {}
         if choose is not None:
-            examples = choose(memory, flow, step)
+            examples, extra = choose(memory, flow, step)
         elif cell["k"] is not None:
             examples = random_examples(memory, flow, step, cell["k"], cell["seed"])
         else:
             examples = memory.everything(step, end_of(flow))
-        fields = {**cell, "step": step, "n_examples": len(examples), "first_contact": memory.first_contact(flow, step)}
+        fields = {**cell, **extra, "step": step, "n_examples": len(examples), "first_contact": memory.first_contact(flow, step)}
         prediction = complete_prediction(detector.predict(flow, examples), flow, fields)
         append_prediction(run_dir, prediction)
         memory.add(flow, prediction)

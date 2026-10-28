@@ -74,6 +74,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=run.SELECTIONS,
         help="Examples of a stream: by score and MMR (score, the default) or at random (random, line 0)",
     )
+    runner.add_argument(
+        "--control",
+        choices=run.CONTROLS,
+        default="fixed",
+        help="k per Category: the same at every step (fixed, the default) or the KController's mirrored AIMD from k = 1 (aimd)",
+    )
     runner.add_argument("--neighbours", help="K of the kNN: a number, or matched:k for as many as the Selector gives Jev at k")
     runner.set_defaults(handler=run_command)
 
@@ -121,6 +127,7 @@ def run_command(args: argparse.Namespace) -> None:
         record=args.record,
         selection=args.selection,
         neighbours=args.neighbours,
+        control=args.control,
     )
     run.run_from_spec(spec)
 

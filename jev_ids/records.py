@@ -80,11 +80,18 @@ def read_predictions(run_dir: Path) -> list[Prediction]:
 
     A row written before the compact record existed (docs/jevids-design.md, D7) has no `record` and read the values in full, so it gets
     `full` here and groups apart from a compact run. A row written before the `Selector` existed (D6) has no `selection`: its Examples
-    were drawn at random, unless it is a forest's (k = all), which gets the whole memory.
+    were drawn at random, unless it is a forest's (k = all), which gets the whole memory. A row written before the `KController` (D5) has
+    no `control`: its k was fixed.
     """
     path = run_dir / "predictions.jsonl"
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as handle:
         rows: list[Prediction] = [json.loads(line) for line in handle if line.strip()]
-    return [{"record": "full", "selection": None if row.get("k") is None else "random"} | row for row in rows]
+    return [default_fields(row) | row for row in rows]
+
+
+def default_fields(row: Prediction) -> Prediction:
+    """What a row written before stages 2 to 4 lacks: `record`, `selection` and `control` as they were then."""
+    chosen = row.get("k") is not None
+    return {"record": "full", "selection": "random" if chosen else None, "control": "fixed" if chosen else None}

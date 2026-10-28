@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from jev_ids import ROOT, dataset
+from jev_ids.controller import Controlled
 from jev_ids.dataset import Config, Flow
 from jev_ids.detectors import random_forest
 from jev_ids.detectors.isolation_forest import IsolationForestDetector
@@ -41,6 +42,7 @@ from jev_ids.stream import Choose, Memory, split_names, stream_cell
 
 RESULTS_DIR = ROOT / "results"
 SELECTIONS = ("random", "score")
+CONTROLS = ("fixed", "aimd")
 # The Detectors that get the whole memory (k = all) instead of chosen Examples.
 WHOLE_MEMORY = ("random_forest", "isolation_forest", "knn")
 
@@ -70,6 +72,8 @@ class RunSpec:
         selection: how a stream gives Jev and the LLMs their Examples, `random` (line 0) or `score` (the `Selector`, D6); None means
             `score` for a stream and `random` otherwise, the only choice the protocol of the first paper has.
         neighbours: K of the kNN, a number or `matched:k` (`knn.parse_neighbours`); None for every other Detector.
+        control: `fixed`, the same k for every Category and step, or `aimd`, the `KController` (D5), where k is the starting k₀ = 1 and
+            the `Selector` gives the Examples.
     """
 
     detector: str
@@ -85,6 +89,7 @@ class RunSpec:
     record: str = "compact"
     selection: str | None = None
     neighbours: str | None = None
+    control: str = "fixed"
 
 
 def load_prompt(path: Path) -> dict[str, Any]:
@@ -132,6 +137,10 @@ def check_spec(spec: RunSpec, detector_name: str) -> None:
         raise ValueError(f"the {detector_name} runs at k = all only")
     if spec.selection is not None and (spec.selection not in SELECTIONS or (spec.delay is None and spec.selection == "score")):
         raise ValueError(f"selection {spec.selection!r}: `random` or `score`, and `score` needs a stream (--delay)")
+    if spec.control not in CONTROLS:
+        raise ValueError(f"control {spec.control!r}: `fixed` or `aimd`")
+    if spec.control == "aimd" and (spec.delay is None or spec.selection == "random" or spec.k_values != (1,)):
+        raise ValueError("control `aimd` needs a stream (--delay), the `score` selection and k = 1, its k₀ (D5)")
 
 
 def selection_of(spec: RunSpec, detector_name: str) -> str | None:
@@ -206,6 +215,7 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
         "prompt_hash": detector.prompt_hash,
         "record": detector.record,
         "selection": selection_of(spec, detector.name),
+        "control": spec.control if spec.detector not in WHOLE_MEMORY else None,
     }
     if spec.delay is not None:
         execute_stream(spec, detector, config, (flows, train), run_fields)
@@ -245,18 +255,23 @@ def execute_stream(
     names = split_names(config["dir"] / "splits" / f"{spec.split}.csv")
     selector = Selector(Space(random_forest.vocabulary(train, config), train)) if run_fields["selection"] == "score" else None
     for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
-        # A fresh memory per cell: what one cell learned must not leak into the next.
+        # A fresh memory and a fresh controller per cell: what one cell learned must not leak into the next.
         memory = Memory(train, config["categories"], spec.delay, names)
         cell = {**run_fields, "k": k, "seed": seed, "repetition": repetition, "delay": spec.delay}
-        stream_cell(run_dir, detector, memory, flows, cell, choose_with(selector, k, config["categories"]))
+        stream_cell(run_dir, detector, memory, flows, cell, choose_with(selector, k, config["categories"], spec.control))
 
 
-def choose_with(selector: Selector | None, k: int | None, categories: Sequence[str]) -> Choose | None:
-    """The `Selector` at k Examples per Category, as `stream_cell` calls it; None keeps the stream's own random draw or whole memory."""
+def choose_with(selector: Selector | None, k: int | None, categories: Sequence[str], control: str = "fixed") -> Choose | None:
+    """The `Selector` as `stream_cell` calls it: at k Examples per Category, or with a fresh `KController` for `aimd`.
+
+    None keeps the stream's own random draw or whole memory.
+    """
     if selector is None or k is None:
         return None
+    if control == "aimd":
+        return Controlled(selector, categories)
     k_by_category = dict.fromkeys(categories, float(k))
-    return lambda memory, flow, step: selector.choose(memory, flow, step, k_by_category)
+    return lambda memory, flow, step: (selector.choose(memory, flow, step, k_by_category), {})
 
 
 def judge(run_dir: Path, detector: Detector, flows: Sequence[Flow], examples: Sequence[Flow], cell: dict[str, Any]) -> None:
@@ -305,6 +320,7 @@ def redo_errors(run_dir: Path) -> Path:
         record=fields.get("record", "full"),
         selection=fields.get("selection"),
         neighbours=fields.get("neighbours"),
+        control=fields.get("control", "fixed"),
     )
     config = dataset.load_config(spec.dataset)
     flows = dataset.load_split(config["dir"] / "splits" / f"{spec.split}.csv", config)

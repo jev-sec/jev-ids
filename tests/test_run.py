@@ -86,7 +86,7 @@ def test_execute_covers_every_cell_in_order_and_writes_the_three_files(card: Pat
     assert detector.calls == zero_shot * 2 + one_shot * 2
     assert {p["n_examples"] for p in predictions} == {0, 3}
     shared = {
-        *("run_id", "dataset", "detector", "model", "split", "prompt_hash", "record", "selection"),
+        *("run_id", "dataset", "detector", "model", "split", "prompt_hash", "record", "selection", "control"),
         *("k", "seed", "repetition", "n_examples", "row_id", "is_attack", "classification_verdict"),
         *("category_true", "novel_attack", "p_attack", "category_pred"),
         *("latency_ms", "usage", "request_id", "ts_utc"),
@@ -311,3 +311,19 @@ def test_the_knn_needs_its_neighbours_and_the_whole_memory(card: Path) -> None:
     run.check_spec(spec, "knn")
     with pytest.raises(ValueError, match="k = all"):
         run.check_spec(replace(spec, k_values=(4,)), "knn")
+
+
+def test_aimd_needs_a_scored_stream_from_k_one_and_writes_k_per_category(card: Path) -> None:
+    spec = replace(smoke_spec(card, k_values=(1,)), delay=1, control="aimd")
+    run.check_spec(spec, "jev")
+    for wrong in (replace(spec, k_values=(4,)), replace(spec, selection="random"), replace(spec, delay=None), replace(spec, control="x")):
+        with pytest.raises(ValueError, match="control"):
+            run.check_spec(wrong, "jev")
+    start = datetime(2017, 7, 3, 12, 0)
+    train = [replace(flow, end=start + timedelta(minutes=index)) for index, flow in enumerate(TRAIN)]
+    flows = [replace(flow, end=start + timedelta(minutes=10 + index)) for index, flow in enumerate(FLOWS)]
+    run_dir = run.execute(spec, FakeDetector(), dataset.load_config(card), flows, train)
+    rows = records.read_predictions(run_dir)
+    assert {row["control"] for row in rows} == {"aimd"}
+    # The fake detector is always right, so every k stays at k_min = 1.
+    assert all(set(row["k_by_category"].values()) == {1.0} for row in rows)
