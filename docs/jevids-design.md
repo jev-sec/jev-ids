@@ -13,7 +13,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0        |
 | Stage 0                                 | Done, commit `3b011d8`                                                  |
 | Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
-| Stage 2                                 | Code done, see D7; line 1 below                                         |
+| Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
 | Stages 3 to 6 below                     | Not started                                                             |
 
 ## Goal
@@ -319,6 +319,24 @@ false alarms on seed 0 and the forest none. With feedback after every Flow, the 
 the start of a new attack (steps 57 and 58 of BruteForce, 126 of DoS, 202 to 210 of PortScan). Jev's 335 USD per 1M Flows is below the
 pilot's 557 at k = 4 because early in the week the memory holds few Categories: 12.5 Examples per request on average, not 24. Wall
 time: Jev 4 min for 900 calls, the Random Forest 7.2 min (mean fit 1.3 s on 12 cores), the Isolation Forest 1.4 min.
+
+### Line 1: compact record (pilot, D = 1)
+
+Jev, k = 4 at random, seeds 0 to 2, run at commit `b1d7001` (`results/design-cicids2017/20261028T174340.933684Z-cicids2017-jev-pilot`).
+The Examples are the same as in line 0 (same seeds, same memory, same number per request), so the record format is the only change.
+
+| Line              | F1            | Precision | Recall | Novel recall | Novel, first contact | False alarms | Missed | PR-AUC | Input tokens per request | Cost per 1M Flows |
+| ----------------- | ------------- | --------- | ------ | ------------ | -------------------- | ------------ | ------ | ------ | ------------------------ | ----------------- |
+| 0, full record    | 0.951 ± 0.012 | 0.908     | 0.998  | 1.000        | 9 of 9               | 15.3         | 0.3    | 0.995  | 7,975                    | 335 USD           |
+| 1, compact record | 0.937 ± 0.011 | 0.883     | 0.998  | 1.000        | 9 of 9               | 20.0         | 0.3    | 0.991  | 5,443                    | 229 USD           |
+
+The compact record cut input tokens per request by 31.7 % and the cost from 335 to 229 USD per 1M Flows, as the character count
+predicted. Recall did not move, every novel Flow included (two DoS Flows swapped, one each way). The price was paid on BENIGN: false alarms rose
+on every seed (18 to 22, 10 to 16, 18 to 22). McNemar of line 0 against line 1, per seed, all Flows: 6 to 2, 7 to 2 and 7 to 2 for
+line 0 (p = 0.29, 0.18, 0.18), not significant on any seed; known attacks 0 to 0, 0 to 1 and 1 to 0; novel attacks no discordant Flow.
+Of the 26 discordant Flows over the three seeds, 24 are BENIGN (19 newly flagged, 5 no longer flagged) and 2 DoS (one each way). The
+three seeds point the same way, so a small loss of precision from rounding is plausible, but the pilot cannot tell it from noise; the
+paper split in stage 6, where the ablation removes the compact record, will.
 
 ## Changes after results
 
