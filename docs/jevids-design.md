@@ -16,7 +16,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
-| Stage 5                                 | Cut and commands fixed in D9, validation stream not run yet             |
+| Stage 5                                 | Commit `805d7e4`, cut 0.64 from the validation stream, line 4 below     |
 | Stage 6                                 | Not started                                                             |
 
 ## Goal
@@ -431,6 +431,12 @@ The controller's path: BENIGN rose up to k = 4.6 after false alarms and came bac
 of seed 0), because with one Example Jev named 15 DDoS Flows DoS (5 per seed, none in line 2) while still calling them attacks; DoS,
 BruteForce and Botnet never left 1. The controller reacts to the Category, so a confusion between two attack Categories costs tokens
 without changing the Verdict.
+
+### Line 4: threshold (pilot, D = 1)
+
+The validation stream chose the cut p_attack ≥ 0.64 before line 4 was computed. It is the full system of line 3 run at commit `805d7e4` over the 300 validation Flows (177 BENIGN, 123 attacks, no novel attack), seeds 0 to 2, with no failed call (`results/design-cicids2017/20261028T204508.479115Z-cicids2017-jev-validation`). `jev-ids threshold` picked 0.64 among 91 distinct p_attack values, because Jev reports them to two decimals. On the validation stream the cut raised mean F1 from 0.933 to 0.985 and cut false alarms from 17.7 to 2.3 per seed. It also missed 1.3 attacks per seed where 0.5 missed none, the four attacks of seed 0 with p_attack between 0.60 and 0.62. PR-AUC was 0.999.
+
+Line 4 is line 3's rows taken again at 0.64 (D9), computed only after this paragraph was committed.
 
 ## Changes after results
 
