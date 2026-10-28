@@ -1,0 +1,39 @@
+{
+  "code_commit": "805d7e4fbf079db7c4802fe3b3e9cde15ac4ce11",
+  "dataset": {
+    "name": "cicids2017",
+    "sha256": "0ba2d737915aff648142f84077a4f3ffb8d60a9a6a9bc25167e0ab7b1dcaa39d"
+  },
+  "detector": "jev",
+  "model": "jev-1.13.0",
+  "prompt_hash": "6d83e55bf662e84aa245e7eb3198a9e3b5683be17d6418a8515990dc5af7f8eb",
+  "run_id": "20261028T204508.479115Z-cicids2017-jev-validation",
+  "selection": "score",
+  "spec": {
+    "control": "aimd",
+    "dataset": "data/cicids2017/dataset.json",
+    "delay": 1,
+    "detector": "jev",
+    "jobs": -1,
+    "k_values": [
+      1
+    ],
+    "model_id": null,
+    "neighbours": null,
+    "record": "compact",
+    "reps": 1,
+    "results_dir": "results/design-cicids2017",
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "selection": null,
+    "split": "validation"
+  },
+  "split": {
+    "name": "validation",
+    "sha256": "8488bf99aa5a085c7a9b8d8f0251b7614bd2ae42ee74a379fd30f079e2237286"
+  },
+  "started_at": "2026-10-28T20:45:08+00:00"
+}
