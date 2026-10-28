@@ -12,7 +12,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, replaced in stage 0 |
 | Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0        |
 | Stage 0                                 | Done, commit `3b011d8`                                                  |
-| Stage 1                                 | Stream and memory implemented (`jev_ids/stream.py`); line 0 running     |
+| Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
 | Stages 2 to 6 below                     | Not started                                                             |
 
 ## Goal
@@ -252,6 +252,25 @@ Jev's F1 is flat from k = 4 to k = 8 while its cost nearly doubles, which is the
 error is false alarms on BENIGN, not missed attacks. The Random Forest at k = all missed all 10 SSH-Patator Flows of seed 0; on the novel
 subset Jev at k = 8 beat it in 18 discordant pairs to 0 (McNemar p = 7.6e-6 per seed), while overall the two did not differ (p 0.61 to
 0.87).
+
+## Line results
+
+### Line 0: stream, memory, random Examples (pilot, D = 1)
+
+300 Flows, 152 benign, 148 attacks (48 novel). Jev over seeds 0 to 2; the forests over seed 0 only, refitted at every Flow.
+
+| Detector             | F1            | Precision | Recall | Novel recall | Novel, first contact | False alarms | Missed | PR-AUC | Cost per 1M Flows |
+| -------------------- | ------------- | --------- | ------ | ------------ | -------------------- | ------------ | ------ | ------ | ----------------- |
+| Jev, k = 4 at random | 0.951 ± 0.012 | 0.908     | 0.998  | 1.000        | 9 of 9               | 15.3         | 0.3    | 0.995  | 335 USD           |
+| Random Forest        | 0.973         | 1.000     | 0.947  | 0.875        | 1 of 3               | 0            | 8      | 1.000  | ~0                |
+| Isolation Forest     | 0.426         | 0.843     | 0.285  | 0.146        | 1 of 3               | 8            | 108    | 0.846  | ~0                |
+
+Jev against the Random Forest on seed 0 (McNemar, discordant Flows): all Flows 8 to 18 for the forest (p = 0.076), novel attacks
+6 to 0 for Jev (p = 0.031), known attacks 2 to 0 for Jev (p = 0.5); the forest's advantage is entirely on BENIGN, where Jev raised 18
+false alarms on seed 0 and the forest none. With feedback after every Flow, the forest learns each burst from its first Flows; it misses
+the start of a new attack (steps 57 and 58 of BruteForce, 126 of DoS, 202 to 210 of PortScan). Jev's 335 USD per 1M Flows is below the
+pilot's 557 at k = 4 because early in the week the memory holds few Categories: 12.5 Examples per request on average, not 24. Wall
+time: Jev 4 min for 900 calls, the Random Forest 7.2 min (mean fit 1.3 s on 12 cores), the Isolation Forest 1.4 min.
 
 ## Changes after results
 
