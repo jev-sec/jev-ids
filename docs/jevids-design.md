@@ -14,7 +14,8 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 0                                 | Done, commit `3b011d8`                                                  |
 | Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
 | Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
-| Stages 3 to 6 below                     | Not started                                                             |
+| Stage 3                                 | `Selector` coded; kNN and line 2 to come                                |
+| Stages 4 to 6 below                     | Not started                                                             |
 
 ## Goal
 
@@ -124,6 +125,27 @@ repeat ceil(k_c) times: take the e maximising
 
 The three ideas combined are recency (traffic and attacks drift), difficulty (Flows near the boundary between Categories, right or wrong)
 and similarity to the Flow under test. The score is per Flow, so Examples now change from request to request.
+
+Fixed on 2026-10-28, before line 2 was run (`jev_ids/selector.py`):
+
+- An exact copy is never chosen: MMR skips any candidate at distance 0 from an Example already chosen, and a Category left with copies
+  only gets fewer Examples. The formula alone does not ensure the proof of stage 3: a copy scoring 0.03 (on 0 to 3) above a near copy at
+  distance 0.01 would win. The pool holds 1,195 BENIGN and 1,333 PortScan Flows that have an exact twin.
+- Jev was wrong on e when `category_pred` differs from e's true Category, the error the `KController` reacts to (D5).
+- Equal distances or ends share their mean rank, so equal Flows get equal terms. Ties in the MMR value go to the earlier candidate (pool
+  Flows by end, then returned Flows in the order they were judged).
+- The numeric features are standardised with the pool's mean and standard deviation (a constant feature keeps scale 1); the Protocol
+  one-hot columns are left as 0 and 1.
+- The Examples of a request are shuffled with a seed made of the Flow's row_id only, so repetitions send the same request.
+- `jev-ids run --selection random|score` chooses between line 0's draw and the `Selector`; a stream uses `score` by default, and
+  `selection` is written in `config.json` and in every row (`None` for the forests, `random` for rows written before it existed).
+
+Checked on real Flows before the run (pilot stream, line 1's seed 0 answers as the memory's rows, k = 4, steps 60, 150 and 250): the
+score term λ·score/3 of the chosen Examples lay between 0.20 and 0.48 and the highest redundancy among them between 0.02 and 0.69, so the
+two terms of MMR are on comparable scales. Standardised distances to the Flow under test have medians of 2.6 to 9.9, so redundancy is
+small (about 0.1 to 0.25) except between near copies, which is where MMR is meant to act. In tight Categories (Botnet: distances 4.54 to
+4.58 for most candidates) MMR then reaches for far outliers (distances 52 to 158) after the first pick, because every near candidate is
+almost a copy of it. One choice takes 265 ms on average (658 ms at most), 80 s per 300-Flow cell; the space is built in 2 s.
 
 ### D7. Compact record, no column removed
 

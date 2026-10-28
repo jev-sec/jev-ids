@@ -4,6 +4,8 @@ import hashlib
 import json
 import re
 from collections.abc import Sequence
+from dataclasses import replace
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -84,7 +86,7 @@ def test_execute_covers_every_cell_in_order_and_writes_the_three_files(card: Pat
     assert detector.calls == zero_shot * 2 + one_shot * 2
     assert {p["n_examples"] for p in predictions} == {0, 3}
     shared = {
-        *("run_id", "dataset", "detector", "model", "split", "prompt_hash", "record"),
+        *("run_id", "dataset", "detector", "model", "split", "prompt_hash", "record", "selection"),
         *("k", "seed", "repetition", "n_examples", "row_id", "is_attack", "classification_verdict"),
         *("category_true", "novel_attack", "p_attack", "category_pred"),
         *("latency_ms", "usage", "request_id", "ts_utc"),
@@ -267,3 +269,32 @@ def test_each_committed_prompt_pair_matches_its_card(name: str) -> None:
     assert f"\n{body['state']['columns']}\n" in text
     assert text.count("{examples}") == 1
     assert "JSON" in text
+
+
+def test_selection_is_score_in_a_stream_random_outside_and_none_for_the_forests() -> None:
+    stream_spec = run.RunSpec("jev", NSL_KDD, "smoke", (4,), (0,), delay=1)
+    assert run.selection_of(stream_spec, "jev") == "score"
+    assert run.selection_of(replace(stream_spec, selection="random"), "jev") == "random"
+    assert run.selection_of(replace(stream_spec, delay=None), "jev") == "random"
+    assert run.selection_of(stream_spec, "random_forest") is None
+    run.check_spec(replace(stream_spec, selection="random"), "jev")
+    with pytest.raises(ValueError, match="needs a stream"):
+        run.check_spec(replace(stream_spec, delay=None, selection="score"), "jev")
+    with pytest.raises(ValueError, match="selection"):
+        run.check_spec(replace(stream_spec, selection="best"), "jev")
+    assert run.choose_with(None, 4, ["normal"]) is None
+
+
+def test_a_stream_run_gives_jev_the_selector_s_examples(card: Path) -> None:
+    start = datetime(2017, 7, 3, 12, 0)
+    train = [replace(flow, end=start + timedelta(minutes=index)) for index, flow in enumerate(TRAIN)]
+    flows = [replace(flow, end=start + timedelta(minutes=10 + index)) for index, flow in enumerate(FLOWS)]
+    detector = FakeDetector()
+    spec = replace(smoke_spec(card, k_values=(1,)), delay=1)
+    run_dir = run.execute(spec, detector, dataset.load_config(card), flows, train)
+    rows = records.read_predictions(run_dir)
+    assert {(row["selection"], row["record"]) for row in rows} == {("score", "compact")}
+    # One Example per Category from the pool, then the returned Flows of each Category join the candidates.
+    assert [n for _, n in detector.calls] == [3, 3, 3]
+    config_json = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+    assert (config_json["spec"]["selection"], config_json["selection"]) == (None, "score")

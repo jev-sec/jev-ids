@@ -67,6 +67,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="compact",
         help="values Jev and the LLMs read: 4 significant digits (compact, the default) or as the CSV has them (full)",
     )
+    runner.add_argument(
+        "--selection",
+        choices=run.SELECTIONS,
+        help="Examples of a stream: by score and MMR (score, the default) or at random (random, line 0)",
+    )
     runner.set_defaults(handler=run_command)
 
     redoer = commands.add_parser("redo-errors", help="complete a run in place: its error rows again, its missing flows for the first time")
@@ -111,6 +116,7 @@ def run_command(args: argparse.Namespace) -> None:
         delay=args.delay,
         jobs=args.jobs,
         record=args.record,
+        selection=args.selection,
     )
     run.run_from_spec(spec)
 

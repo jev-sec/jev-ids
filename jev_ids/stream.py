@@ -4,7 +4,8 @@ In reading order:
 
 - `in_stream_order`: a split in the order its Flows end.
 - `Memory`: what has happened before a Flow, by Category: the pool Flows that ended before it and the judged Flows whose label came back.
-- `random_examples`: k Examples per Category, drawn at random from the memory for one Flow (line 0 of docs/jevids-design.md).
+- `random_examples`: k Examples per Category, drawn at random from the memory for one Flow (line 0 of docs/jevids-design.md); the
+  `Selector` of `jev_ids/selector.py` replaces it from stage 3 on.
 - `split_names`: the attack name of every row of a split, for `first_contact` only.
 - `stream_cell`: one (k, seed, rep) cell over the stream, one call and one appended row per Flow.
 
@@ -18,7 +19,7 @@ memory holds Flows, which carry the Category only, and the names read from the s
 import bisect
 import csv
 import random
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -33,6 +34,10 @@ class Predictor(Protocol):
     name: str
 
     def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]: ...  # noqa: D102  documented by each Detector
+
+
+# What gives a Flow its Examples at a step: the `Selector` since stage 3; None in `stream_cell` falls back to the random draw of line 0.
+Choose = Callable[["Memory", Flow, int], list[Flow]]
 
 
 def end_of(flow: Flow) -> datetime:
@@ -63,11 +68,14 @@ class Memory:
         self._pool = {category: in_stream_order([flow for flow in pool if flow.category == category]) for category in self.categories}
         self._pool_ends = {category: [end_of(flow) for flow in flows] for category, flows in self._pool.items()}
         self.judged: list[tuple[Flow, Prediction]] = []
+        # row_id -> the row a judged Flow produced, for the `Selector`'s difficulty; row_ids are unique across the pool and the splits.
+        self.rows: dict[int, Prediction] = {}
         self.names = dict(names or {})
 
     def add(self, flow: Flow, prediction: Prediction) -> None:
         """Record the Flow judged at step len(judged), with the row it produced; it comes back D steps later."""
         self.judged.append((flow, prediction))
+        self.rows[flow.row_id] = prediction
 
     def returned(self, step: int) -> list[tuple[Flow, Prediction]]:
         """The judged Flows whose label has come back by `step`, in the order they were judged."""
@@ -112,22 +120,26 @@ def split_names(path: Path) -> dict[int, str]:
         return {int(row["row_id"]): row["raw_label"] for row in csv.DictReader(handle) if row.get("raw_label")}
 
 
-def stream_cell(
+def stream_cell(  # noqa: PLR0913, PLR0917 - the cell's fields plus the hook that gives its Examples
     run_dir: Path,
     detector: Predictor,
     memory: Memory,
     flows: Sequence[Flow],
     cell: dict[str, Any],
+    choose: Choose | None = None,
 ) -> None:
     """One cell: every Flow in stream order, its Examples from the memory, one call and one appended row, then the progress line.
 
     `cell["k"]` is k Examples per Category for Jev, or None for a forest, which gets the whole memory and refits on it at every step; a
     refit every 100 steps was tried first and left the forests days behind on the pilot (docs/jevids-design.md, "Changes after results").
     A novel attack's row says whether it met its attack name for the first time (`first_contact`): no Flow of that name had come back yet.
+    `choose`, when given, replaces the random draw for Jev (the `Selector`, stage 3).
     """
     errors = 0
     for step, flow in enumerate(in_stream_order(flows)):
-        if cell["k"] is not None:
+        if choose is not None:
+            examples = choose(memory, flow, step)
+        elif cell["k"] is not None:
             examples = random_examples(memory, flow, step, cell["k"], cell["seed"])
         else:
             examples = memory.everything(step, end_of(flow))

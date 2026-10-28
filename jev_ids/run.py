@@ -35,9 +35,12 @@ from jev_ids.detectors.jev import JevDetector
 from jev_ids.detectors.llm import LLMDetector
 from jev_ids.detectors.random_forest import RandomForestDetector
 from jev_ids.records import append_prediction, complete_prediction, read_predictions, write_config
-from jev_ids.stream import Memory, split_names, stream_cell
+from jev_ids.selector import Selector, Space
+from jev_ids.stream import Choose, Memory, split_names, stream_cell
 
 RESULTS_DIR = ROOT / "results"
+SELECTIONS = ("random", "score")
+FORESTS = ("random_forest", "isolation_forest")
 
 # The detectors share no base class; the run loop only needs `name`, `model`, `prompt_hash` and `predict`, which each of them has.
 Detector = JevDetector | LLMDetector | RandomForestDetector | IsolationForestDetector
@@ -62,6 +65,8 @@ class RunSpec:
             of Examples, the protocol of the first paper.
         record: how Jev and the LLMs read a Flow's values, `full` or `compact` (`dataset.RECORDS`, docs/jevids-design.md, D7); the
             forests always read them in full.
+        selection: how a stream gives Jev and the LLMs their Examples, `random` (line 0) or `score` (the `Selector`, D6); None means
+            `score` for a stream and `random` otherwise, the only choice the protocol of the first paper has.
     """
 
     detector: str
@@ -75,6 +80,7 @@ class RunSpec:
     delay: int | None = None
     jobs: int = 1
     record: str = "compact"
+    selection: str | None = None
 
 
 def load_prompt(path: Path) -> dict[str, Any]:
@@ -115,6 +121,17 @@ def check_spec(spec: RunSpec, detector_name: str) -> None:
         raise ValueError("the Random Forest starts at k = 1")
     if detector_name == "isolation_forest" and spec.k_values != (None,):
         raise ValueError("the Isolation Forest runs at k = all only")
+    if spec.selection is not None and (spec.selection not in SELECTIONS or (spec.delay is None and spec.selection == "score")):
+        raise ValueError(f"selection {spec.selection!r}: `random` or `score`, and `score` needs a stream (--delay)")
+
+
+def selection_of(spec: RunSpec, detector_name: str) -> str | None:
+    """How the Examples are chosen: None for the forests (the whole memory), else the spec's choice, `score` in a stream by default."""
+    if detector_name in FORESTS:
+        return None
+    if spec.selection is not None:
+        return spec.selection
+    return "score" if spec.delay is not None else "random"
 
 
 def sample_examples(train: Sequence[Flow], k: int, seed: int, categories: Sequence[str]) -> list[Flow]:
@@ -164,6 +181,7 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
             "dataset": {"name": config["name"], "sha256": config["sha256"]},
             "split": {"name": spec.split, "sha256": hashlib.sha256(split_path.read_bytes()).hexdigest()},
             "prompt_hash": detector.prompt_hash,
+            "selection": selection_of(spec, detector.name),
             "code_commit": described.stdout.strip(),
             "started_at": started.isoformat(timespec="seconds"),
         },
@@ -178,15 +196,10 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
         "split": spec.split,
         "prompt_hash": detector.prompt_hash,
         "record": detector.record,
+        "selection": selection_of(spec, detector.name),
     }
     if spec.delay is not None:
-        split_path = config["dir"] / "splits" / f"{spec.split}.csv"
-        names = split_names(split_path)
-        for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
-            # A fresh memory per cell: what one cell learned must not leak into the next.
-            memory = Memory(train, config["categories"], spec.delay, names)
-            cell = {**run_fields, "k": k, "seed": seed, "repetition": repetition, "delay": spec.delay}
-            stream_cell(run_dir, detector, memory, flows, cell)
+        execute_stream(spec, detector, config, (flows, train), run_fields)
         print(f"done: {run_dir}")
         return run_dir
     for k, seed in itertools.product(spec.k_values, spec.seeds):
@@ -203,6 +216,38 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
             )
     print(f"done: {run_dir}")
     return run_dir
+
+
+def execute_stream(
+    spec: RunSpec,
+    detector: Detector,
+    config: Config,
+    data: tuple[Sequence[Flow], Sequence[Flow]],
+    run_fields: dict[str, Any],
+) -> None:
+    """Every (k, seed, rep) cell as a stream over the split (`data` is the split and the pool), each with a fresh memory.
+
+    With the `score` selection the `Selector` gives every Category ceil(k) Examples; its space is built once for the run, because it only
+    depends on the pool.
+    """
+    flows, train = data
+    run_dir = spec.results_dir / run_fields["run_id"]
+    assert spec.delay is not None  # noqa: S101  execute only streams with a delay
+    names = split_names(config["dir"] / "splits" / f"{spec.split}.csv")
+    selector = Selector(Space(random_forest.vocabulary(train, config), train)) if run_fields["selection"] == "score" else None
+    for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
+        # A fresh memory per cell: what one cell learned must not leak into the next.
+        memory = Memory(train, config["categories"], spec.delay, names)
+        cell = {**run_fields, "k": k, "seed": seed, "repetition": repetition, "delay": spec.delay}
+        stream_cell(run_dir, detector, memory, flows, cell, choose_with(selector, k, config["categories"]))
+
+
+def choose_with(selector: Selector | None, k: int | None, categories: Sequence[str]) -> Choose | None:
+    """The `Selector` at k Examples per Category, as `stream_cell` calls it; None keeps the stream's own random draw or whole memory."""
+    if selector is None or k is None:
+        return None
+    k_by_category = dict.fromkeys(categories, float(k))
+    return lambda memory, flow, step: selector.choose(memory, flow, step, k_by_category)
 
 
 def judge(run_dir: Path, detector: Detector, flows: Sequence[Flow], examples: Sequence[Flow], cell: dict[str, Any]) -> None:
@@ -249,6 +294,7 @@ def redo_errors(run_dir: Path) -> Path:
         results_dir=Path(fields["results_dir"]),
         # A run made before the compact record existed read the values in full.
         record=fields.get("record", "full"),
+        selection=fields.get("selection"),
     )
     config = dataset.load_config(spec.dataset)
     flows = dataset.load_split(config["dir"] / "splits" / f"{spec.split}.csv", config)

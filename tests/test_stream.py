@@ -130,3 +130,19 @@ def test_a_forest_gets_the_whole_memory_at_every_step(tmp_path: Path) -> None:
     # Step 2 ends at minute 6: normal 0 to 5, dos 20, probe 22, and Flows 101 and 102 came back.
     assert {e.row_id for e in lists[2]} == {0, 1, 2, 3, 4, 5, 20, 22, 101, 102}
     assert [row["n_examples"] for row in rows] == [len(examples) for examples in lists]
+
+
+def test_a_choose_hook_replaces_the_random_draw(tmp_path: Path) -> None:
+    recorder = Recorder()
+    memory = stream.Memory(POOL, CATEGORIES, 1, NAMES)
+    seen: list[int] = []
+
+    def choose(memory: stream.Memory, flow: Flow, step: int) -> list[Flow]:
+        seen.append(step)
+        return memory.visible("probe", step, stream.end_of(flow))
+
+    stream.stream_cell(tmp_path, recorder, memory, FLOWS, {"k": 4, "seed": 0, "repetition": 0, "delay": 1}, choose)
+    assert seen == [0, 1, 2, 3]
+    # Only the probe Flow, which ends at minute 5, and only for the Flows ending after it.
+    assert [[e.row_id for e in examples] for _, examples in recorder.calls] == [[], [], [22], [22]]
+    assert memory.rows[101]["category_true"] == "normal"

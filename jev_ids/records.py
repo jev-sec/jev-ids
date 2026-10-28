@@ -79,10 +79,12 @@ def read_predictions(run_dir: Path) -> list[Prediction]:
     """Every row of a run's predictions.jsonl; an absent file is an empty run.
 
     A row written before the compact record existed (docs/jevids-design.md, D7) has no `record` and read the values in full, so it gets
-    `full` here and groups apart from a compact run.
+    `full` here and groups apart from a compact run. A row written before the `Selector` existed (D6) has no `selection`: its Examples
+    were drawn at random, unless it is a forest's (k = all), which gets the whole memory.
     """
     path = run_dir / "predictions.jsonl"
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as handle:
-        return [{"record": "full"} | json.loads(line) for line in handle if line.strip()]
+        rows: list[Prediction] = [json.loads(line) for line in handle if line.strip()]
+    return [{"record": "full", "selection": None if row.get("k") is None else "random"} | row for row in rows]
