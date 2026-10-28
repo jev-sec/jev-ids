@@ -221,7 +221,7 @@ def test_run_dir_name_has_timestamp_dataset_detector_and_split(card: Path) -> No
 
 
 def test_k_all_is_for_the_forests_only_and_each_forest_has_its_k_guard() -> None:
-    with pytest.raises(ValueError, match="only meaningful for the Random Forest"):
+    with pytest.raises(ValueError, match="only meaningful for the forests and the kNN"):
         run.check_spec(run.RunSpec("jev", NSL_KDD, "smoke", (None,), (0,)), "jev")
     with pytest.raises(ValueError, match="starts at k = 1"):
         run.check_spec(run.RunSpec("random_forest", NSL_KDD, "smoke", (0, 1), (0,)), "random_forest")
@@ -308,5 +308,6 @@ def test_the_knn_needs_its_neighbours_and_the_whole_memory(card: Path) -> None:
     assert run.selection_of(spec, "knn") is None
     with pytest.raises(ValueError, match="--neighbours"):
         run.build_detector(replace(spec, neighbours=None), config)
+    run.check_spec(spec, "knn")
     with pytest.raises(ValueError, match="k = all"):
         run.check_spec(replace(spec, k_values=(4,)), "knn")

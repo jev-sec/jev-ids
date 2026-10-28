@@ -121,11 +121,11 @@ def build_detector(spec: RunSpec, config: Config) -> Detector:
 def check_spec(spec: RunSpec, detector_name: str) -> None:
     """Refuse what would waste calls.
 
-    k = all exists only for the two forests; the Random Forest cannot train on nothing at k = 0, and the Isolation Forest learns from the
-    benign pool alone, so it runs at k = all only.
+    k = all exists only for the two forests and the kNN; the Random Forest cannot train on nothing at k = 0, and the Isolation Forest
+    (benign Flows alone) and the kNN (the whole memory) run at k = all only.
     """
-    if None in spec.k_values and detector_name not in ("random_forest", "isolation_forest"):
-        raise ValueError("k = all is only meaningful for the Random Forest and the Isolation Forest")
+    if None in spec.k_values and detector_name not in WHOLE_MEMORY:
+        raise ValueError("k = all is only meaningful for the forests and the kNN")
     if detector_name == "random_forest" and 0 in spec.k_values:
         raise ValueError("the Random Forest starts at k = 1")
     if detector_name in ("isolation_forest", "knn") and spec.k_values != (None,):
