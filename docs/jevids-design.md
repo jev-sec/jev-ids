@@ -439,3 +439,12 @@ fit takes up to 17.5 s on one core at 90,000 Flows, far slower than traffic arri
 once (`Encoder`), and a fit may use several cores (`--jobs`, -1 for all by default; one fit on the whole pool went from 14.3 s to 3.4 s
 with identical predictions). The forests run with one seed, because seeds 0 to 2 gave identical rows: their random_state is fixed and
 the memory does not depend on the seed.
+
+### 2026-10-28: a fixed k = 1 control for the `KController`
+
+Seen: in line 3 every Category sat at k = 1 in 76 % of the steps, and the controller added 0.44 Examples per request on average above
+k = 1 (3.6 against about 3.1), so line 3's cost cut could come from starting at k₀ = 1 rather than from reacting to errors.
+
+Changed: nothing in the design. One comparison is added, decided before it was run: Jev with the `Selector` at a fixed k = 1
+(`--k 1 --control fixed`), seeds 0 to 2, pilot, D = 1. If it matches line 3, the mirrored AIMD adds nothing beyond "one Example per
+Category"; if it errs more, the reaction to errors pays for itself.
