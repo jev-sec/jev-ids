@@ -104,14 +104,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     comparer.add_argument("--k-a", help="cut run A to this k or `all`")
     comparer.add_argument("--k-b", help="cut run B to this k or `all`")
-    comparer.add_argument("--threshold-a", type=float, help="take the Verdicts of A again at this cut instead of 0.5 (D9)")
-    comparer.add_argument("--threshold-b", type=float, help="take the Verdicts of B again at this cut instead of 0.5 (D9)")
     comparer.set_defaults(handler=compare_command)
 
     signer = commands.add_parser("sign-test", help="flow-level sign test of two detectors on every subset and k, Holm-adjusted")
     signer.add_argument("--a", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector A")
     signer.add_argument("--b", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector B")
     signer.set_defaults(handler=sign_test_command)
+
+    # Giving both paired tests a cut per side, so the full system at its tuned cut can meet a baseline at 0.5 (D9).
+    for paired in (comparer, signer):
+        paired.add_argument("--threshold-a", type=float, help="take the Verdicts of A again at this cut instead of 0.5 (D9)")
+        paired.add_argument("--threshold-b", type=float, help="take the Verdicts of B again at this cut instead of 0.5 (D9)")
 
     tuner = commands.add_parser("threshold", help="the cut on p_attack with the best mean F1 over the validation runs given (D9)")
     tuner.add_argument("run_dirs", nargs="+", type=Path, help="results/<run_id> directories of the validation stream")
@@ -163,7 +166,7 @@ def compare_command(args: argparse.Namespace) -> None:
 
 def sign_test_command(args: argparse.Namespace) -> None:
     """`sign-test`: the flow-level sign test on all flows, known and novel attacks, with Holm's adjustment across every row, as CSV."""
-    run_a, run_b = read_runs(args.a), read_runs(args.b)
+    run_a, run_b = read_runs(args.a, args.threshold_a), read_runs(args.b, args.threshold_b)
     table = [
         {"subset": subset, **row}
         for subset in ("all", "known", "novel")

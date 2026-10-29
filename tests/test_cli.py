@@ -95,6 +95,9 @@ def test_sign_test_prints_every_subset_with_holm_p(tmp_path: Path, capsys: pytes
     assert lines[0] == "subset,k,flows,a_better,b_better,sign_p,holm_p"
     # The known subset holds no flow, so only `all` and `novel` give a row, and Holm caps both adjusted p-values at 1.
     assert lines[1:] == ["all,1,1,1,0,1.0,1.0", "novel,1,1,1,0,1.0,1.0"]
+    # Cutting B at 0.0 turns its miss into an alert, so the Flow ties and favours neither run.
+    assert cli.main(["sign-test", "--a", str(tmp_path / "a"), "--b", str(tmp_path / "b"), "--threshold-b", "0.0"]) == 0
+    assert capsys.readouterr().out.splitlines()[1] == "all,1,1,0,0,1.0,1.0"
 
 
 def test_threshold_prints_the_cut_and_metrics_and_compare_take_verdicts_again(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
