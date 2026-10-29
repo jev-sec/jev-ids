@@ -257,6 +257,7 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 - Every line reports recall on novel attacks separately, at first contact (a novel Flow judged before any Flow of its attack name has
   entered the memory) and after feedback.
 - The final ablation removes one component at a time from the full system, because components added one by one interact.
+- Timing for stage 6, measured on 2026-10-29. `Selector.choose` over every 20th Flow of the paper stream (the memory holding the pool only, no Detector call, no label of the split read) took 71 ms on average at k = 1 and 90 ms at k = 8 (95th percentile 139 and 182 ms), as on the pilot (68 and 83 ms). The check of D6 measured 265 ms under other conditions (k = 4, line 1's rows in the memory). In the runs themselves a Flow took 0.36 s of wall time on the validation stream and 0.41 s in line 3, of which Jev's latency was 0.23 and 0.26 s. One Jev configuration over the paper split, three seeds and one D therefore takes about 2,000 × 3 × 0.4 s = 40 min.
 - Without the `Selector`, the ablation keeps the `KController` and draws ceil(k_c) Examples of each Category at random with the cell's seed (`--selection random --control aimd`). The random draw is the one of line 0, so a fixed k gives the same Examples as before.
 - Comparisons of cost are made at equal tokens per Flow, or as a cost against F1 curve.
 
