@@ -166,11 +166,9 @@ def test_redo_errors_judges_the_failed_and_the_missing_flows_in_their_cells(card
         "k=2 seed=0 rep=0 flows=2 errors=0",
         f"redone: 2 error rows and 1 missing flows of {run_dir}",
     ]
-    # Refusing a run whose config.json names another model or prompt, because one run_id would then mix two experiments.
-    config_json |= {
-        "model": "fake-1",
-        "prompt_hash": "h",
-    }
+    # Refusing a run whose config.json names another model, because one run_id would then mix two experiments.
+    # A forest has no prompt, so the message must also hold when `prompt_hash` is None.
+    config_json["model"] = "fake-1"
     (run_dir / "config.json").write_text(json.dumps(config_json), encoding="utf-8")
     with pytest.raises(ValueError, match="fake-1"):
         run.redo_errors(run_dir)

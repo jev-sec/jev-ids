@@ -414,7 +414,9 @@ def redo_errors(run_dir: Path) -> Path:
     train = dataset.load_split(config["dir"] / "pool.csv", config)
     detector = build_detector(spec, config)
     if (detector.model, detector.prompt_hash) != (stored["model"], stored["prompt_hash"]):
-        raise ValueError(f"{run_dir.name} was run with {stored['model']} on prompt {stored['prompt_hash'][:8]}; the code now gives another")
+        # Naming the stored prompt by its first 8 hex digits, or `none` for a forest or the kNN, which read no prompt.
+        prompt = (stored["prompt_hash"] or "none")[:8]
+        raise ValueError(f"{run_dir.name} was run with {stored['model']} on prompt {prompt}, and the code now gives another")
     rows = read_predictions(run_dir)
     kept = [row for row in rows if row.get("error") is None]
     (run_dir / "predictions.jsonl").write_text("".join(json.dumps(row) + "\n" for row in kept), encoding="utf-8")
