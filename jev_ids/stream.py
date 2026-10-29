@@ -4,9 +4,8 @@ In reading order:
 
 - `in_stream_order`: a split in the order its Flows end.
 - `Memory`: what has happened before a Flow, by Category: the pool Flows that ended before it and the judged Flows whose label came back.
-- `random_examples`: ceil(k_c) Examples of each Category c, drawn at random from the memory for one Flow (line 0 of
-  docs/jevids-design.md, and stage 6's ablation without the `Selector`). The `Selector` of `jev_ids/selector.py` replaces it
-  from stage 3 on.
+- `random_examples`: ceil(k_c) Examples of each Category c, drawn at random from the memory for one Flow, for line 0
+  of docs/jevids-design.md and stage 6's ablation without the `Selector`, which replaces it from stage 3 on.
 - `split_names`: the attack name of every row of a split, for `first_contact` only.
 - `stream_cell`: one (k, seed, rep) cell over the stream, one call and one appended row per Flow.
 
@@ -105,9 +104,9 @@ class Memory:
 def random_examples(memory: Memory, flow: Flow, step: int, k: Mapping[str, float], seed: int) -> list[Flow]:
     """Draw ceil(k[c]) Examples of each Category c at random from the memory for this Flow, or all of c when it has fewer.
 
-    A fixed k gives every Category the same count (line 0), and the `KController` gives each its own (the ablation without the `Selector`).
-    The draw is seeded by the seed, the Flow and the Category, so a cell can be replayed, and shuffled once more so no Detector sees the
-    Examples grouped by Category.
+    A fixed k gives every Category the same count (line 0), and the `KController` gives each its own
+    (the ablation without the `Selector`). The draw is seeded by the seed, the Flow and the Category,
+    so a cell can be replayed, and shuffled once more so no Detector sees the Examples grouped by Category.
     """
     chosen: list[Flow] = []
     for category in memory.categories:

@@ -1,10 +1,10 @@
 """Tables from predictions.jsonl rows: `summarize` one or more runs, `compare` or `sign_test` two, `best_threshold` on validation.
 
-Helpers first (`verdict`, `at_threshold`, `mean`, `ratio`, `rate`, `only_subset`, `only_k`, `group_by_fields`), then the scores of one set
-of rows (`recall_by_category`, `ranking`, `scores`), the priced usage (`cost_usd_per_1m`, `share_used`, `latency`, `usage`),
-the summary (`summary`, `none_last_key`, `summarize`), the cut of D9 (`best_threshold`) and the paired comparisons (`mcnemar_exact`,
-`holm`, `sign_test`, `compare_cell`, `compare`). F1 is the attack class's, not macro. A row without a Verdict counts as `normal`
-(fail-open) and ranks lowest, and the CLI turns the dicts into CSV.
+Helpers first (`verdict`, `at_threshold`, `mean`, `ratio`, `rate`, `only_subset`, `only_k`, `group_by_fields`),
+then the scores of one set of rows (`recall_by_category`, `ranking`, `scores`), the priced usage (`cost_usd_per_1m`,
+`share_used`, `latency`, `usage`), the summary (`summary`, `none_last_key`, `summarize`), the cut of D9 (`best_threshold`)
+and the paired comparisons (`mcnemar_exact`, `holm`, `sign_test`, `compare_cell`, `compare`). F1 is the attack class's,
+not macro. A row without a Verdict counts as `normal` (fail-open) and ranks lowest, and the CLI turns the dicts into CSV.
 """
 
 import json
@@ -221,9 +221,9 @@ def summarize(predictions: Iterable[Prediction]) -> list[dict[str, Any]]:
 def best_threshold(predictions: Sequence[Prediction]) -> dict[str, float]:
     """The cut on p_attack with the highest F1 averaged over the (seed, rep) cells, chosen on the validation stream (D9).
 
-    The candidates are VERDICT_THRESHOLD (0.5) and every p_attack present, because F1 only changes where the cut passes a row. A tie
-    goes to the candidate nearest 0.5, so the cut moves only as far as F1 asks. Rows of any split but `validation` are refused, so a
-    test split never shapes the cut.
+    The candidates are VERDICT_THRESHOLD (0.5) and every p_attack present, because F1 only changes
+    where the cut passes a row. A tie goes to the candidate nearest 0.5, so the cut moves only as far
+    as F1 asks. Rows of any split but `validation` are refused, so a test split never shapes the cut.
     """
     if any(prediction["split"] != "validation" for prediction in predictions):
         raise ValueError("the cut is chosen on the validation stream only (docs/jevids-design.md, D9)")

@@ -17,7 +17,7 @@ from jev_ids.dataset import Flow
 from jev_ids.records import Prediction
 from jev_ids.stream import Memory
 
-# What `Controlled` asks for the Examples of one Flow: `Selector.choose`, or `random_examples` bound to the cell's seed.
+# Naming what `Controlled` asks for the Examples of one Flow, either `Selector.choose` or `random_examples` bound to the cell's seed.
 Pick = Callable[[Memory, Flow, int, Mapping[str, float]], list[Flow]]
 
 # The values of D5, fixed before any stream result.
@@ -39,8 +39,8 @@ class KController:
     def feedback(self, row: Prediction) -> None:
         """React to one returned row. An error multiplies the k of its true Category by beta (up to K_MAX), a success removes ALPHA / k.
 
-        An error is `category_pred` differing from the true Category, and k never falls below K_MIN. A failed call (`error`) is ignored,
-        because Jev gave no answer to judge.
+        An error is `category_pred` differing from the true Category, and k never falls below K_MIN.
+        A failed call (`error`) is ignored, because Jev gave no answer to judge.
         """
         if row.get("error") is not None:
             return

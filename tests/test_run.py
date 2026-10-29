@@ -330,6 +330,6 @@ def test_aimd_needs_a_stream_from_k_one_and_writes_k_per_category(card: Path, se
     run_dir = run.execute(spec, detector, dataset.load_config(card), flows, train)
     rows = records.read_predictions(run_dir)
     assert {(row["control"], row["selection"], row["beta"]) for row in rows} == {("aimd", selection, 3.0)}
-    # The fake detector is always right, so every k stays at k_min = 1 and each Category gives one Example.
+    # Expecting every k to stay at k_min = 1 and one Example per Category, because the fake detector is always right.
     assert all(set(row["k_by_category"].values()) == {1.0} for row in rows)
     assert [n for _, n in detector.calls] == [3, 3, 3]
