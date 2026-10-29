@@ -68,3 +68,56 @@ paper-summary:
 	  uv run jev-ids compare --a $(PAPER_DIR)/*-jev-paper/ --b $(PAPER_DIR)/*-llm-gemini-paper/ --subset $$subset \
 	    > $(PAPER_DIR)/compare-jev-gemini-$$subset.csv; \
 	done
+
+# Stage 6 (docs/jevids-design.md, "Stage 6 in slots"): the paper split of CIC-IDS2017 read once, in 15 slots of 60 to 90 minutes,
+# each a chain of whole runs that needs nobody at the keyboard. A stream run cannot be redone (`redo-errors` refuses it), so a slot cut
+# midway loses the run it was in and keeps the finished ones. `make -k stage6-N` goes on to the next run when one fails, and caffeinate
+# keeps the Mac awake while a run lasts. The rule `stage6-<line>-d<D>` runs one line of the final table at the delay D.
+KEEP_AWAKE = $(if $(shell command -v caffeinate),caffeinate -i)
+STAGE6_RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/cicids2017/dataset.json --split paper \
+  --results-dir results/design-cicids2017 --delay
+STAGE6_JEV = --detector jev --seeds 0,1,2
+STAGE6_ONCE = --k all --seeds 0
+.PHONY: $(addprefix stage6-,1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+
+# Slots 1 to 4 at D = 1, 5 to 8 at D = 100, 9 to 12 at D = 500, then the β check at each D.
+stage6-1: stage6-full-d1 stage6-if-d1 stage6-knn4-d1 stage6-knnmatched-d1
+stage6-2: stage6-fixedk1-d1 stage6-rf-d1
+stage6-3: stage6-randomk4-d1 stage6-noctl-d1
+stage6-4: stage6-nosel-d1 stage6-nocompact-d1
+stage6-5: stage6-full-d100 stage6-if-d100 stage6-knn4-d100 stage6-knnmatched-d100
+stage6-6: stage6-fixedk1-d100 stage6-rf-d100
+stage6-7: stage6-randomk4-d100 stage6-noctl-d100
+stage6-8: stage6-nosel-d100 stage6-nocompact-d100
+stage6-9: stage6-full-d500 stage6-if-d500 stage6-knn4-d500 stage6-knnmatched-d500
+stage6-10: stage6-fixedk1-d500 stage6-rf-d500
+stage6-11: stage6-randomk4-d500 stage6-noctl-d500
+stage6-12: stage6-nosel-d500 stage6-nocompact-d500
+stage6-13: stage6-beta1.5-d1 stage6-beta3-d1
+stage6-14: stage6-beta1.5-d100 stage6-beta3-d100
+stage6-15: stage6-beta1.5-d500 stage6-beta3-d500
+
+stage6-full-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd
+stage6-fixedk1-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1
+stage6-randomk4-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 4 --selection random
+stage6-noctl-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 4
+stage6-nosel-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --selection random --control aimd
+stage6-nocompact-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd --record full
+stage6-beta1.5-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd --beta 1.5
+stage6-beta3-d%:
+	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd --beta 3
+stage6-rf-d%:
+	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector random_forest
+stage6-if-d%:
+	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector isolation_forest
+stage6-knn4-d%:
+	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours 4
+stage6-knnmatched-d%:
+	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours matched:4

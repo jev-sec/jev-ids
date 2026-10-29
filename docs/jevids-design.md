@@ -17,7 +17,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
 | Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below           |
-| Stage 6                                 | Not started                                                             |
+| Stage 6                                 | In progress, plan in "Stage 6 in slots" below, no slot run yet          |
 
 ## Goal
 
@@ -261,6 +261,26 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 - Without the `Selector`, the ablation keeps the `KController` and draws ceil(k_c) Examples of each Category at random with the cell's seed (`--selection random --control aimd`). The random draw is the one of line 0, so a fixed k gives the same Examples as before.
 - The sensitivity check sets β with `--beta` (1.5, 2 or 3), accepted only under `--control aimd`. Every row carries `beta` (None without the `KController`), and `jev-ids metrics` groups by it. Rows written before the option read as β = 2 under `aimd`, the value D5 fixed.
 - Comparisons of cost are made at equal tokens per Flow, or as a cost against F1 curve.
+
+### Stage 6 in slots
+
+Fixed on 2026-10-29, before any run on the paper split. Stage 6 runs in 15 slots of 60 to 90 minutes, `make -k stage6-1` to `make -k stage6-15` (`Makefile`), because nobody can watch some 20 hours of runs in one sitting. Each slot chains whole runs, and each run is one line at one D with seeds 0 to 2 (seed 0 alone for the forests and the kNN, D10). The slots go in this order, so the first ones already compare the full system with the baselines at D = 1.
+
+| Slots      | D           | Runs                                                                       | Minutes |
+| ---------- | ----------- | -------------------------------------------------------------------------- | ------- |
+| 1, 5, 9    | 1, 100, 500 | Full system, Isolation Forest, kNN at K = 4 and at matched:4               | 66      |
+| 2, 6, 10   | 1, 100, 500 | Jev at a fixed k = 1, Random Forest                                        | 88      |
+| 3, 7, 11   | 1, 100, 500 | Jev at a random k = 4, without the `KController` (`Selector`, fixed k = 4) | 80      |
+| 4, 8, 12   | 1, 100, 500 | Without the `Selector`, without the compact record                         | 80      |
+| 13, 14, 15 | 1, 100, 500 | β = 1.5 and β = 3                                                          | 80      |
+
+The minutes come from the wall time per Flow measured before, 0.4 s for Jev and, on the pilot, 1.44 s for the Random Forest, 0.29 s for the Isolation Forest and 0.17 s and 0.30 s for the two kNN.
+
+- The ablation without the threshold costs no run, because it is the full system's rows taken at 0.5.
+- The full system, the other three ablations and Jev at a fixed k = 1 are read at 0.64, the cut of line 4. Jev at a fixed k = 1 shares the cut because it must differ from the full system in the `KController` alone (D10). The other baselines are read at 0.5, because the cut was tuned on the full system's validation stream and says nothing about another configuration. `jev-ids metrics --threshold` still shows any of them at either cut.
+- β runs at every D, so the check also covers the delays where the controller hears of its errors late.
+- The rows of a finished slot may be read before the next one starts. Nothing in this plan changes after such a reading, and a change would be logged in [Changes after results](#changes-after-results) with the result that prompted it.
+- A slot cut midway loses the run it was in, because a stream run cannot be redone. That run starts again from scratch, and its partial directory goes to the Trash so the metrics never read it.
 
 ## Notes for implementation
 
