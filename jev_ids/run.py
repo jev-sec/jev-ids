@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from jev_ids import ROOT, dataset
-from jev_ids.controller import Controlled
+from jev_ids.controller import BETA, Controlled, KController
 from jev_ids.dataset import Config, Flow
 from jev_ids.detectors import random_forest
 from jev_ids.detectors.isolation_forest import IsolationForestDetector
@@ -75,6 +75,7 @@ class RunSpec:
         neighbours: K of the kNN, a number or `matched:k` (`knn.parse_neighbours`); None for every other Detector.
         control: `fixed`, the same k for every Category and step, or `aimd`, the `KController` (D5), where k is the starting k₀ = 1 and
             the `Selector` gives the Examples, or a random draw under `random` (stage 6's ablation without the `Selector`).
+        beta: the `KController`'s factor on an error under `aimd`, 2 as D5 fixed it, varied in stage 6's sensitivity check only.
     """
 
     detector: str
@@ -91,6 +92,7 @@ class RunSpec:
     selection: str | None = None
     neighbours: str | None = None
     control: str = "fixed"
+    beta: float = BETA
 
 
 def load_prompt(path: Path) -> dict[str, Any]:
@@ -136,12 +138,14 @@ def check_spec(spec: RunSpec, detector_name: str) -> None:
         raise ValueError("the Random Forest starts at k = 1")
     if detector_name in ("isolation_forest", "knn") and spec.k_values != (None,):
         raise ValueError(f"the {detector_name} runs at k = all only")
-    if spec.selection is not None and (spec.selection not in SELECTIONS or (spec.delay is None and spec.selection == "score")):
+    if spec.selection not in (None, *SELECTIONS) or (spec.delay is None and spec.selection == "score"):
         raise ValueError(f"selection {spec.selection!r}: `random` or `score`, and `score` needs a stream (--delay)")
     if spec.control not in CONTROLS:
         raise ValueError(f"control {spec.control!r}: `fixed` or `aimd`")
     if spec.control == "aimd" and (spec.delay is None or spec.k_values != (1,)):
         raise ValueError("control `aimd` needs a stream (--delay) and k = 1, its k₀ (D5)")
+    if spec.beta != BETA and spec.control != "aimd":
+        raise ValueError(f"beta {spec.beta}: only with control `aimd`, whose error factor it is")
 
 
 def selection_of(spec: RunSpec, detector_name: str) -> str | None:
@@ -217,6 +221,7 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
         "record": detector.record,
         "selection": selection_of(spec, detector.name),
         "control": spec.control if spec.detector not in WHOLE_MEMORY else None,
+        "beta": spec.beta if spec.control == "aimd" else None,
     }
     if spec.delay is not None:
         execute_stream(spec, detector, config, (flows, train), run_fields)
@@ -256,24 +261,25 @@ def execute_stream(
     names = split_names(config["dir"] / "splits" / f"{spec.split}.csv")
     selector = Selector(Space(random_forest.vocabulary(train, config), train)) if run_fields["selection"] == "score" else None
     for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
-        # A fresh memory and a fresh controller per cell: what one cell learned must not leak into the next.
+        # Giving each cell a fresh memory and a fresh controller, so what one cell learned never leaks into the next.
         memory = Memory(train, config["categories"], spec.delay, names)
+        controller = KController(config["categories"], spec.beta) if spec.control == "aimd" else None
         cell = {**run_fields, "k": k, "seed": seed, "repetition": repetition, "delay": spec.delay}
-        stream_cell(run_dir, detector, memory, flows, cell, choose_with(selector, k, config["categories"], spec.control, seed))
+        stream_cell(run_dir, detector, memory, flows, cell, choose_with(selector, k, config["categories"], seed, controller))
 
 
 def choose_with(
-    selector: Selector | None, k: int | None, categories: Sequence[str], control: str = "fixed", seed: int = 0
+    selector: Selector | None, k: int | None, categories: Sequence[str], seed: int = 0, controller: KController | None = None
 ) -> Choose | None:
-    """The hook `stream_cell` calls for the Examples: the `Selector` at k per Category, or a fresh `KController` under `aimd`.
+    """The hook `stream_cell` calls for the Examples, either the `Selector` at k per Category or the cell's `KController` under `aimd`.
 
-    Under `aimd` without a `Selector`, the ablation of stage 6, the controller's k is drawn at random with the cell's seed. None keeps
+    With a controller and no `Selector`, the ablation of stage 6, the controller's k is drawn at random with the cell's seed. None keeps
     the stream's own random draw (line 0) or the whole memory (the forests and the kNN).
     """
     if k is None:
         return None
-    if control == "aimd":
-        return Controlled(partial(random_examples, seed=seed) if selector is None else selector.choose, categories)
+    if controller is not None:
+        return Controlled(partial(random_examples, seed=seed) if selector is None else selector.choose, controller)
     if selector is None:
         return None
     k_by_category = dict.fromkeys(categories, float(k))

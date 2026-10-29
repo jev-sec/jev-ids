@@ -23,6 +23,7 @@ from typing import Any
 from dotenv import load_dotenv
 
 from jev_ids import ROOT, metrics, run
+from jev_ids.controller import BETA
 from jev_ids.dataset import RECORDS
 from jev_ids.records import Prediction, read_predictions
 
@@ -80,6 +81,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=run.CONTROLS,
         default="fixed",
         help="k per Category: the same at every step (fixed, the default) or the KController's mirrored AIMD from k = 1 (aimd)",
+    )
+    runner.add_argument(
+        "--beta",
+        type=float,
+        default=BETA,
+        help="the KController's factor on an error under --control aimd (2, as D5 fixed it, outside the sensitivity check)",
     )
     runner.add_argument("--neighbours", help="K of the kNN: a number, or matched:k for as many as the Selector gives Jev at k")
     runner.set_defaults(handler=run_command)
@@ -139,6 +146,7 @@ def run_command(args: argparse.Namespace) -> None:
         selection=args.selection,
         neighbours=args.neighbours,
         control=args.control,
+        beta=args.beta,
     )
     run.run_from_spec(spec)
 

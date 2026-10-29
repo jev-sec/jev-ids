@@ -208,9 +208,12 @@ def none_last_key(values: Sequence[Any]) -> tuple[Any, ...]:
 
 
 def summarize(predictions: Iterable[Prediction]) -> list[dict[str, Any]]:
-    """One row per (dataset, detector, model, split, delay, record, selection, control, k), k = all last; delay is None outside a stream."""
+    """One row per (dataset, detector, model, split, delay, record, selection, control, beta, k), k = all last.
+
+    delay is None outside a stream, and beta is None outside the `KController`.
+    """
     prices: dict[str, Any] = json.loads(PRICES_PATH.read_text("utf-8"))["models"]
-    fields = ("dataset", "detector", "model", "split", "delay", "record", "selection", "control", "k")
+    fields = ("dataset", "detector", "model", "split", "delay", "record", "selection", "control", "beta", "k")
     groups = group_by_fields(predictions, fields)
     return [{**dict(zip(fields, key, strict=True)), **summary(groups[key], prices)} for key in sorted(groups, key=none_last_key)]
 

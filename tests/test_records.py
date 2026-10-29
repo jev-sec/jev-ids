@@ -52,8 +52,13 @@ def test_run_files_append_and_read_back(tmp_path: Path) -> None:
     rows = records.read_predictions(run_dir)
     assert [p["p_attack"] for p in rows] == [0.2, 0.9]
     # Every key reaches the file but `raw`, which goes to responses.jsonl instead.
-    assert set(rows[0]) == set(first) - {"raw"} | {"record", "selection", "control"}  # filled for rows written before stages 2 to 4
-    assert set(rows[1]) == set(second) | {"record", "selection", "control"}
+    assert set(rows[0]) == set(first) - {"raw"} | {
+        "record",
+        "selection",
+        "control",
+        "beta",
+    }  # filled for rows written before stages 2 to 4 and 6
+    assert set(rows[1]) == set(second) | {"record", "selection", "control", "beta"}
     assert (run_dir / "config.json").read_text(encoding="utf-8").startswith("{")
     responses = (run_dir / "responses.jsonl").read_text(encoding="utf-8")
     assert responses.count("\n") == 1

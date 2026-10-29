@@ -81,7 +81,7 @@ def read_predictions(run_dir: Path) -> list[Prediction]:
     A row written before the compact record existed (docs/jevids-design.md, D7) has no `record` and read the values in full, so it gets
     `full` here and groups apart from a compact run. A row written before the `Selector` existed (D6) has no `selection`: its Examples
     were drawn at random, unless it is a forest's (k = all), which gets the whole memory. A row written before the `KController` (D5) has
-    no `control`: its k was fixed.
+    no `control`: its k was fixed. A row written before `beta` became an option (stage 6) has none, and under `aimd` its β was D5's 2.
     """
     path = run_dir / "predictions.jsonl"
     if not path.exists():
@@ -92,6 +92,12 @@ def read_predictions(run_dir: Path) -> list[Prediction]:
 
 
 def default_fields(row: Prediction) -> Prediction:
-    """What a row written before stages 2 to 4 lacks: `record`, `selection` and `control` as they were then."""
+    """What a row written before stages 2 to 4 and 6 lacks: `record`, `selection`, `control` and `beta` as they were then."""
     chosen = row.get("k") is not None
-    return {"record": "full", "selection": "random" if chosen else None, "control": "fixed" if chosen else None}
+    return {
+        "record": "full",
+        "selection": "random" if chosen else None,
+        "control": "fixed" if chosen else None,
+        # Giving an `aimd` row the β of D5, the only one before stage 6. The literal avoids importing the controller into the records.
+        "beta": 2.0 if row.get("control") == "aimd" else None,
+    }

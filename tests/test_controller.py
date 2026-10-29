@@ -26,6 +26,11 @@ def test_an_error_doubles_k_up_to_eight() -> None:
     # A missing Category answer is an error too.
     kc.feedback(row("probe", None))
     assert kc.k["probe"] == 2.0
+    # Tripling k instead under β = 3, a value of stage 6's sensitivity check.
+    tripled = controller.KController(CATEGORIES, beta=3.0)
+    for expected in (3.0, 8.0):
+        tripled.feedback(row("dos", "normal"))
+        assert tripled.k["dos"] == expected
 
 
 def test_a_success_removes_one_over_k_down_to_one() -> None:
@@ -56,7 +61,9 @@ def test_the_hook_reacts_when_the_label_comes_back_at_t_plus_d() -> None:
     start = datetime(2017, 7, 3, 12, 0)
     pool = [replace(make_flow(index, category, value=str(index)), end=start) for index, category in enumerate(["normal", "dos", "dos"])]
     memory = stream.Memory(pool, CATEGORIES, 2)
-    hook = controller.Controlled(selector.Selector(selector.Space(vocabulary(pool, CONFIG), pool)).choose, CATEGORIES)
+    hook = controller.Controlled(
+        selector.Selector(selector.Space(vocabulary(pool, CONFIG), pool)).choose, controller.KController(CATEGORIES)
+    )
     flows = [replace(make_flow(100 + step, "dos", value="1"), end=start + timedelta(minutes=step + 1)) for step in range(3)]
     k_seen: list[float] = []
     for step, flow in enumerate(flows):

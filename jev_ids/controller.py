@@ -24,28 +24,30 @@ Pick = Callable[[Memory, Flow, int, Mapping[str, float]], list[Flow]]
 K_START = 1.0
 K_MIN = 1.0
 K_MAX = 8.0
-BETA = 2.0  # multiplicative increase on error
+BETA = 2.0  # multiplicative increase on error, varied over 1.5, 2 and 3 in stage 6's sensitivity check only
 ALPHA = 1.0  # additive decrease on success, spread over a window of k_c successes
 
 
 class KController:
-    """One k per Category; a Category without feedback keeps its k."""
+    """One k per Category, while a Category without feedback keeps its k."""
 
-    def __init__(self, categories: Sequence[str]) -> None:
-        """Every Category starts at K_START."""
+    def __init__(self, categories: Sequence[str], beta: float = BETA) -> None:
+        """Every Category starts at K_START, and an error multiplies its k by `beta`."""
         self.k = dict.fromkeys(categories, K_START)
+        self.beta = beta
 
     def feedback(self, row: Prediction) -> None:
-        """React to one returned row: error doubles the k of its true Category (up to K_MAX), success removes ALPHA / k (down to K_MIN).
+        """React to one returned row. An error multiplies the k of its true Category by beta (up to K_MAX), a success removes ALPHA / k.
 
-        An error is `category_pred` differing from the true Category. A failed call (`error`) is ignored: Jev gave no answer to judge.
+        An error is `category_pred` differing from the true Category, and k never falls below K_MIN. A failed call (`error`) is ignored,
+        because Jev gave no answer to judge.
         """
         if row.get("error") is not None:
             return
         category = row["category_true"]
         k = self.k[category]
         if row.get("category_pred") != category:
-            self.k[category] = min(K_MAX, BETA * k)
+            self.k[category] = min(K_MAX, self.beta * k)
         else:
             self.k[category] = max(K_MIN, k - ALPHA / k)
 
@@ -53,10 +55,10 @@ class KController:
 class Controlled:
     """A chooser with a `KController` per stream cell. At each step the newly returned rows update k, then `pick` chooses the Examples."""
 
-    def __init__(self, pick: Pick, categories: Sequence[str]) -> None:
-        """A fresh controller, before any row has come back."""
+    def __init__(self, pick: Pick, controller: KController) -> None:
+        """The cell's own fresh controller, before any row has come back."""
         self.pick = pick
-        self.controller = KController(categories)
+        self.controller = controller
         self.seen = 0
 
     def __call__(self, memory: Memory, flow: Flow, step: int) -> tuple[list[Flow], dict[str, Any]]:

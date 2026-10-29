@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from jev_ids import records, run, selector, stream
+from jev_ids.controller import KController
 from jev_ids.dataset import Flow
 from jev_ids.detectors import jev
 from jev_ids.detectors.random_forest import vocabulary
@@ -126,7 +127,7 @@ def test_a_pool_flow_judged_in_a_stream_is_never_its_own_example(tmp_path: Path)
     memory = stream.Memory(POOL, CATEGORIES, 1, NAMES)
     chooser = selector.Selector(selector.Space(vocabulary(POOL, CONFIG), POOL))
     cell = {"k": 1, "seed": 0, "repetition": 0, "delay": 1}
-    stream.stream_cell(tmp_path, recorder, memory, POOL, cell, run.choose_with(chooser, 1, CATEGORIES, "aimd"))
+    stream.stream_cell(tmp_path, recorder, memory, POOL, cell, run.choose_with(chooser, 1, CATEGORIES, controller=KController(CATEGORIES)))
     assert len(recorder.calls) == len(POOL)
     assert all(flow.row_id not in {example.row_id for example in examples} for flow, examples in recorder.calls)
 
