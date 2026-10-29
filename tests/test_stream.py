@@ -92,11 +92,15 @@ def test_a_judged_flow_enters_the_memory_exactly_d_steps_later(delay: int) -> No
 def test_random_examples_take_k_per_category_or_all_and_replay() -> None:
     memory = stream.Memory(POOL, CATEGORIES, delay=1)
     flow = FLOWS[0]  # ends at minute 7: normal 0 to 6, dos 20, probe 22
-    examples = stream.random_examples(memory, flow, 0, 2, seed=0)
+    two, nine = dict.fromkeys(CATEGORIES, 2), dict.fromkeys(CATEGORIES, 9)
+    examples = stream.random_examples(memory, flow, 0, two, seed=0)
     assert sorted(example.category for example in examples) == ["dos", "normal", "normal", "probe"]
     assert all(example.end is not None and example.end < flow.end for example in examples if flow.end)
-    assert examples == stream.random_examples(memory, flow, 0, 2, seed=0)
-    assert {e.row_id for e in stream.random_examples(memory, flow, 0, 9, seed=0)} == {0, 1, 2, 3, 4, 5, 6, 20, 22}
+    assert examples == stream.random_examples(memory, flow, 0, two, seed=0)
+    assert {e.row_id for e in stream.random_examples(memory, flow, 0, nine, seed=0)} == {0, 1, 2, 3, 4, 5, 6, 20, 22}
+    # Drawing ceil(k_c) per Category when the `KController` gives each Category its own k.
+    uneven = stream.random_examples(memory, flow, 0, {"normal": 2.5, "dos": 1.0, "probe": 1.0}, seed=0)
+    assert sorted(example.category for example in uneven) == ["dos", "normal", "normal", "normal", "probe"]
 
 
 def test_a_cell_sees_only_the_past_and_writes_one_row_per_step(tmp_path: Path) -> None:

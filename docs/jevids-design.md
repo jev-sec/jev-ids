@@ -257,6 +257,7 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 - Every line reports recall on novel attacks separately, at first contact (a novel Flow judged before any Flow of its attack name has
   entered the memory) and after feedback.
 - The final ablation removes one component at a time from the full system, because components added one by one interact.
+- Without the `Selector`, the ablation keeps the `KController` and draws ceil(k_c) Examples of each Category at random with the cell's seed (`--selection random --control aimd`). The random draw is the one of line 0, so a fixed k gives the same Examples as before.
 - Comparisons of cost are made at equal tokens per Flow, or as a cost against F1 curve.
 
 ## Notes for implementation

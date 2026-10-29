@@ -4,8 +4,9 @@ In reading order:
 
 - `in_stream_order`: a split in the order its Flows end.
 - `Memory`: what has happened before a Flow, by Category: the pool Flows that ended before it and the judged Flows whose label came back.
-- `random_examples`: k Examples per Category, drawn at random from the memory for one Flow (line 0 of docs/jevids-design.md); the
-  `Selector` of `jev_ids/selector.py` replaces it from stage 3 on.
+- `random_examples`: ceil(k_c) Examples of each Category c, drawn at random from the memory for one Flow (line 0 of
+  docs/jevids-design.md, and stage 6's ablation without the `Selector`). The `Selector` of `jev_ids/selector.py` replaces it
+  from stage 3 on.
 - `split_names`: the attack name of every row of a split, for `first_contact` only.
 - `stream_cell`: one (k, seed, rep) cell over the stream, one call and one appended row per Flow.
 
@@ -18,6 +19,7 @@ memory holds Flows, which carry the Category only, and the names read from the s
 
 import bisect
 import csv
+import math
 import random
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
@@ -100,9 +102,10 @@ class Memory:
         return [flow for category in self.categories for flow in self.visible(category, step, now)]
 
 
-def random_examples(memory: Memory, flow: Flow, step: int, k: int, seed: int) -> list[Flow]:
-    """Draw k Examples per Category at random from the memory for this Flow, or all of a Category when it has fewer.
+def random_examples(memory: Memory, flow: Flow, step: int, k: Mapping[str, float], seed: int) -> list[Flow]:
+    """Draw ceil(k[c]) Examples of each Category c at random from the memory for this Flow, or all of c when it has fewer.
 
+    A fixed k gives every Category the same count (line 0), and the `KController` gives each its own (the ablation without the `Selector`).
     The draw is seeded by the seed, the Flow and the Category, so a cell can be replayed, and shuffled once more so no Detector sees the
     Examples grouped by Category.
     """
@@ -110,7 +113,7 @@ def random_examples(memory: Memory, flow: Flow, step: int, k: int, seed: int) ->
     for category in memory.categories:
         candidates = memory.visible(category, step, end_of(flow))
         rng = random.Random(f"{seed}:{flow.row_id}:{category}")  # noqa: S311  seeded, not secret
-        chosen += rng.sample(candidates, min(k, len(candidates)))
+        chosen += rng.sample(candidates, min(math.ceil(k[category]), len(candidates)))
     random.Random(f"{seed}:{flow.row_id}:order").shuffle(chosen)  # noqa: S311  seeded, not secret
     return chosen
 
@@ -143,7 +146,7 @@ def stream_cell(  # noqa: PLR0913, PLR0917 - the cell's fields plus the hook tha
         if choose is not None:
             examples, extra = choose(memory, flow, step)
         elif cell["k"] is not None:
-            examples = random_examples(memory, flow, step, cell["k"], cell["seed"])
+            examples = random_examples(memory, flow, step, dict.fromkeys(memory.categories, float(cell["k"])), cell["seed"])
         else:
             examples = memory.everything(step, end_of(flow))
         fields = {**cell, **extra, "step": step, "n_examples": len(examples), "first_contact": memory.first_contact(flow, step)}

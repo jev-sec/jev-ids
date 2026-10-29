@@ -3,19 +3,22 @@
 In reading order:
 
 - `KController`: one k per Category, raised on an error and lowered on a success, as the labels come back.
-- `Controlled`: the `Selector` asked for ceil(k_c) Examples per Category, the hook a stream cell calls at every step.
+- `Controlled`: a chooser (the `Selector`, or the random draw in the ablation without it) asked for ceil(k_c) Examples per Category,
+  the hook a stream cell calls at every step.
 
 TCP grows its window slowly and halves it on loss; in an IDS the costly error is too few Examples, so the rule is mirrored: multiplicative
 increase on error, additive decrease on success. The controller reacts when a label comes back, at t + D, not when the Flow is judged.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from jev_ids.dataset import Flow
 from jev_ids.records import Prediction
-from jev_ids.selector import Selector
 from jev_ids.stream import Memory
+
+# What `Controlled` asks for the Examples of one Flow: `Selector.choose`, or `random_examples` bound to the cell's seed.
+Pick = Callable[[Memory, Flow, int, Mapping[str, float]], list[Flow]]
 
 # The values of D5, fixed before any stream result.
 K_START = 1.0
@@ -48,11 +51,11 @@ class KController:
 
 
 class Controlled:
-    """The `Selector` with a `KController` per stream cell: at each step the newly returned rows update k, then the Examples are chosen."""
+    """A chooser with a `KController` per stream cell. At each step the newly returned rows update k, then `pick` chooses the Examples."""
 
-    def __init__(self, selector: Selector, categories: Sequence[str]) -> None:
-        """A fresh controller; no row has come back yet."""
-        self.selector = selector
+    def __init__(self, pick: Pick, categories: Sequence[str]) -> None:
+        """A fresh controller, before any row has come back."""
+        self.pick = pick
         self.controller = KController(categories)
         self.seen = 0
 
@@ -63,4 +66,4 @@ class Controlled:
             self.controller.feedback(row)
         self.seen = len(returned)
         k = dict(self.controller.k)
-        return self.selector.choose(memory, flow, step, k), {"k_by_category": {name: round(value, 4) for name, value in k.items()}}
+        return self.pick(memory, flow, step, k), {"k_by_category": {name: round(value, 4) for name, value in k.items()}}

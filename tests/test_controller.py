@@ -56,7 +56,7 @@ def test_the_hook_reacts_when_the_label_comes_back_at_t_plus_d() -> None:
     start = datetime(2017, 7, 3, 12, 0)
     pool = [replace(make_flow(index, category, value=str(index)), end=start) for index, category in enumerate(["normal", "dos", "dos"])]
     memory = stream.Memory(pool, CATEGORIES, 2)
-    hook = controller.Controlled(selector.Selector(selector.Space(vocabulary(pool, CONFIG), pool)), CATEGORIES)
+    hook = controller.Controlled(selector.Selector(selector.Space(vocabulary(pool, CONFIG), pool)).choose, CATEGORIES)
     flows = [replace(make_flow(100 + step, "dos", value="1"), end=start + timedelta(minutes=step + 1)) for step in range(3)]
     k_seen: list[float] = []
     for step, flow in enumerate(flows):
