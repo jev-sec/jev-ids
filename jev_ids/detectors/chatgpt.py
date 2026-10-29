@@ -3,13 +3,13 @@
 In reading order:
 
 - `jwt_expiry` and `TokenStore`: the OAuth tokens on disk, read and refreshed through the Codex client id.
-- `ChatGPTSubscriptionModel`: Agno's `OpenAIResponses` routed to the backend, signed with the token and carrying the `instructions`
-  preamble.
+- `ChatGPTSubscriptionModel`: Agno's `OpenAIResponses` routed to the backend,
+  signed with the token and carrying the `instructions` preamble.
 - `aggregate`: the backend only streams, so the deltas are merged back into one response.
 
-This is the minimal, typed re-implementation of the user's original `ChatGPTSubscriptionModel`: the same environment variables and token
-file, so a login done there is reused here. The browser login is not here: run it once through the original module if the refresh token
-expires.
+This is the minimal, typed re-implementation of the user's original `ChatGPTSubscriptionModel`.
+It reads the same environment variables and token file, so a login done there is reused here.
+The browser login stays in the original module, so run it once there if the refresh token expires.
 """
 
 import base64
@@ -33,10 +33,10 @@ BACKEND_BASE_URL = "https://chatgpt.com/backend-api/codex"
 CLIENT_ID_VAR = "CHATGPT_CLIENT_ID"
 OAUTH_FILE_VAR = "CHATGPT_TOKEN_PATH"
 DEFAULT_OAUTH_FILE = Path.home() / ".chatgpt_oauth" / "tokens.json"
-# A token is renewed this long before it expires, so it never dies in the middle of a call that was started while it was still valid.
+# Renewing a token this long before it expires, so it never dies in the middle of a call that was started while it was still valid.
 REFRESH_MARGIN_SECONDS = 300.0
 JWT_PARTS = 3
-# Sent as `instructions` with every request: the backend requires the field. Fixed after 1,685 calls accepted it.
+# Sending the preamble as `instructions` with every request, since the backend requires the field. Fixed after 1,685 calls accepted it.
 PREAMBLE = (
     "You are a classifier for network intrusion detection. Follow the developer instructions and answer only in the requested JSON format."
 )
@@ -46,6 +46,12 @@ def jwt_expiry(token: str) -> float | None:
     """The `exp` claim of a JWT, read without verifying the signature.
 
     The token is only inspected to know when to refresh it, never trusted for anything else, so the signature does not matter here.
+
+    Args:
+        token: the access token, a JWT.
+
+    Returns:
+        The expiry in Unix seconds, or `None` when the token is malformed or has no `exp` claim.
     """
     parts = token.split(".")
     if len(parts) != JWT_PARTS:
@@ -67,7 +73,7 @@ class TokenStore:
 
     def __init__(self, path: Path | None = None) -> None:
         """Remember where the tokens live; nothing is read until they are needed."""
-        # CHATGPT_TOKEN_PATH when it is set, otherwise the path the original module writes to.
+        # Choosing `CHATGPT_TOKEN_PATH` when it is set, otherwise the path the original module writes to.
         default = Path(os.environ.get(OAUTH_FILE_VAR, str(DEFAULT_OAUTH_FILE))).expanduser()
         self.path = default if path is None else path
         self.tokens: dict[str, Any] = {}
@@ -81,9 +87,12 @@ class TokenStore:
     def access_token(self) -> str:
         """A valid access token, reading the file and refreshing it as needed.
 
-        The file is read the first time a token is asked for, and a missing one points at the login that creates it. A token that expires
-        within REFRESH_MARGIN_SECONDS is renewed before it is handed out, so it never dies in the middle of a call that was started while
-        it was still valid.
+        The file is read the first time a token is asked for, and a missing one points at the login that creates it.
+        A token that expires within `REFRESH_MARGIN_SECONDS` is renewed before it is handed out,
+        so it never dies in the middle of a call that was started while it was still valid.
+
+        Returns:
+            The access token, refreshed first when it was due.
         """
         if not self.tokens:
             if not self.path.exists():
@@ -114,15 +123,15 @@ class TokenStore:
         data: dict[str, Any] = response.json()
         access = str(data["access_token"])
         self.tokens["access_token"] = access
-        # The JWT says when it expires; without a readable claim assume one hour.
+        # Taking the expiry from the JWT, or assuming one hour when it has no readable claim.
         self.tokens["expires_at"] = jwt_expiry(access) or time.time() + 3600
         if "refresh_token" in data:
             self.tokens["refresh_token"] = data["refresh_token"]
         self.save()
 
 
-# A dataclass because Agno's model classes are dataclasses and this one adds fields to `OpenAIResponses`; it is the only place where that is
-# required.
+# Declaring a dataclass because Agno's model classes are dataclasses
+# and this one adds fields to `OpenAIResponses`. It is the only place where that is required.
 @dataclass
 class ChatGPTSubscriptionModel(OpenAIResponses):
     """Agno model routed to the ChatGPT Codex backend with an OAuth token."""
@@ -141,7 +150,7 @@ class ChatGPTSubscriptionModel(OpenAIResponses):
         self.store = False
         self.include = ["reasoning.encrypted_content"]
         self.reasoning_summary = "auto"
-        # The backend requires `instructions`; the preamble goes there.
+        # Putting the preamble in `instructions`, a field the backend requires.
         params: dict[str, Any] = dict(self.request_params or {})
         params["instructions"] = self.preamble
         self.request_params = params
@@ -150,14 +159,21 @@ class ChatGPTSubscriptionModel(OpenAIResponses):
         """Agno's hook for the OpenAI client settings: here the token is the key.
 
         A refreshed token invalidates the cached clients so the next request is signed with the new one.
+
+        Returns:
+            The OpenAI client's keyword arguments, with the token as `api_key` and the backend as `base_url`,
+            plus the parent's optional settings and `client_params`.
         """
         token = self.token_store.access_token()
         if token != self._last_token:
             self._last_token = token
             self.client = None
             self.async_client = None
-        params: dict[str, Any] = {"api_key": token, "base_url": self.base_url}
-        # The parent's optional client settings, passed through only when set.
+        params: dict[str, Any] = {
+            "api_key": token,
+            "base_url": self.base_url,
+        }
+        # Passing the parent's optional client settings through only when they are set.
         for name in ("timeout", "max_retries", "default_headers", "default_query"):
             value = getattr(self, name)
             if value is not None:
@@ -166,7 +182,7 @@ class ChatGPTSubscriptionModel(OpenAIResponses):
             params.update(self.client_params)
         return params
 
-    def invoke(  # noqa: PLR0913, PLR0917 - the parent's signature
+    def invoke(  # noqa: PLR0913, PLR0917  the parent's signature
         self,
         messages: Sequence[Message],
         assistant_message: Message,
@@ -197,8 +213,8 @@ def aggregate(deltas: Any) -> ModelResponse:
     content_parts: list[str] = []
     reasoning_parts: list[str] = []
     for delta in deltas:
-        # Text and reasoning arrive in pieces and are joined at the end; the usage report is resent whole, so the last one seen wins, and
-        # the provider fields accumulate across the stream.
+        # Collecting text and reasoning, which arrive in pieces, to join them at the end. The usage report is resent whole,
+        # so the last one seen wins, and the provider fields accumulate across the stream.
         if delta.content is not None:
             content_parts.append(delta.content)
         if delta.reasoning_content is not None:
@@ -206,7 +222,10 @@ def aggregate(deltas: Any) -> ModelResponse:
         if delta.response_usage is not None:
             merged.response_usage = delta.response_usage
         if delta.provider_data is not None:
-            merged.provider_data = {**(merged.provider_data or {}), **delta.provider_data}
+            merged.provider_data = {
+                **(merged.provider_data or {}),
+                **delta.provider_data,
+            }
     if content_parts:
         merged.content = "".join(content_parts)
     if reasoning_parts:

@@ -3,17 +3,18 @@
 Three providers share this detector: DeepSeek through its own API, an OpenAI GPT-{5,6}.x model through the ChatGPT Codex backend with
 OAuth (see `chatgpt.py`), and Google's Gemini through Vertex AI (the project and region come from `GOOGLE_CLOUD_PROJECT` and
 `GOOGLE_CLOUD_LOCATION`, the credentials from `gcloud auth application-default login`).
+
 In reading order:
 
 - `Judgement`: the JSON answer every LLM must give (Agno's `output_schema`).
-- `LLMDetector`: builds the provider's Agno model once; `predict` runs one Agent per Flow with the instructions of
-  `prompts/<dataset>/llm.md`.
+- `LLMDetector`: builds the provider's Agno model once. Its `predict` runs
+  one Agent per Flow with the instructions of `prompts/<dataset>/llm.md`.
 - `instructions`: that Markdown with the Examples filled in.
 - `make_model`: the Agno model of a provider, with its determinism knobs.
 - `measurements`: what one run measured, read off Agno's RunOutput.
 
-All providers run at the lowest reasoning available. One `Agent.run` per Flow and no retries of our own: a provider error is an error row,
-and the run goes on.
+All providers run at the lowest reasoning available. Each Flow gets one `Agent.run`
+and no retries of our own, so a provider error becomes an error row and the run goes on.
 """
 
 import time
@@ -29,8 +30,12 @@ from pydantic import BaseModel, Field
 from jev_ids.dataset import Flow, record_text
 from jev_ids.detectors import chatgpt
 
-DEFAULT_MODEL = {"deepseek": "deepseek-flash", "openai": "gpt-5.6-luna", "gemini": "gemini-3.6-flash"}
-# Replaces `{examples}` in the prompt file at k > 0; at k = 0 the placeholder is simply removed.
+DEFAULT_MODEL = {
+    "deepseek": "deepseek-flash",
+    "openai": "gpt-5.6-luna",
+    "gemini": "gemini-3.6-flash",
+}
+# Heading the Examples that replace `{examples}` in the prompt file at k > 0. At k = 0 the placeholder is simply removed.
 EXAMPLES_HEADER = "\nLabeled example records (record => category):\n"
 
 
@@ -63,17 +68,24 @@ class LLMDetector:
         self.provider = provider
         self.model = model_id or DEFAULT_MODEL[provider]
         self.name = f"llm:{provider}"
-        # The model object holds the HTTP client and, on the ChatGPT path, the
-        # OAuth tokens, so it is built once; an Agent is cheap and built per call.
+        # Building the model object once, because it holds the HTTP client and,
+        # on the ChatGPT path, the OAuth tokens. An Agent is cheap and built per call.
         self.agno_model: Any = make_model(provider, self.model)
 
     def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]:
         """One Agent run for one Flow; the Examples travel in the instructions.
 
-        DeepSeek only offers `json_object` mode, so there the schema is enforced by parsing; the OpenAI path keeps Agno's default strict
-        `json_schema`. Agno's own retries and telemetry are off.
+        DeepSeek only offers `json_object` mode, so there the schema is enforced by parsing,
+        while the OpenAI path keeps Agno's default strict `json_schema`. Agno's own retries and telemetry are off.
+
+        Args:
+            flow: the Flow to judge.
+            examples: the labeled Examples, written into the instructions.
+
+        Returns:
+            The `measurements` of the run, or `error` when the provider call raised.
         """
-        # `Any` because Agno's `run` overloads are partially untyped for pyright.
+        # Typing the agent as `Any`, because Agno's `run` overloads are partially untyped for pyright.
         agent: Any = Agent(
             model=self.agno_model,
             instructions=instructions(self.template, examples, self.record),
@@ -86,18 +98,27 @@ class LLMDetector:
         started = time.perf_counter()
         try:
             run: RunOutput = agent.run(f"Record:\n{record_text(flow, self.record)}")
-        except Exception as exc:  # every provider error is recorded, not raised
+        # Recording every provider error in the row instead of raising it.
+        except Exception as exc:
             return {"error": f"{type(exc).__name__}: {exc}"[:500]}
         return measurements(run, (time.perf_counter() - started) * 1000)
 
 
 def instructions(template: str, examples: Sequence[Flow], record: str = "compact") -> str:
-    """The prompt file with `{examples}` filled with the labeled Examples, their values written as `record` says.
+    """The prompt file with `{examples}` filled with the labeled Examples.
 
     Examples are labeled by Category only, because attack names never reach a model (CONTEXT.md); at k = 0 the placeholder is removed. The
     word "JSON" in the file is required: DeepSeek's `json_object` mode refuses a prompt that does not mention it.
+
+    Args:
+        template: the text of `prompts/<dataset>/llm.md`.
+        examples: the labeled Examples, which may be empty.
+        record: how the values of the Examples are written, one of `dataset.RECORDS`.
+
+    Returns:
+        The instructions of the Agent.
     """
-    lines = "".join(f"{record_text(e, record)} => {e.category}\n" for e in examples)
+    lines = "".join(f"{record_text(example, record)} => {example.category}\n" for example in examples)
     return template.replace("{examples}", EXAMPLES_HEADER + lines if lines else "")
 
 
@@ -108,6 +129,13 @@ def make_model(provider: str, model_id: str) -> Any:
     temperature and runs at `reasoning_effort="none"`, the lowest available. Gemini 3.x cannot switch thinking off; `thinking_level="low"`
     is the lowest Agno documents, and the temperature is 0. Its client has no request timeout of its own, and Vertex has held a
     connection open for minutes, freezing the run; two minutes turns such a hang into an error row that `redo-errors` repairs.
+
+    Args:
+        provider: `deepseek`, `openai` or `gemini`.
+        model_id: the provider's model id.
+
+    Returns:
+        A `DeepSeek`, `Gemini` or `chatgpt.ChatGPTSubscriptionModel`, by provider.
     """
     if provider == "deepseek":
         return DeepSeek(id=model_id, temperature=0.0, use_thinking=False)
@@ -122,6 +150,13 @@ def measurements(run: RunOutput, latency_ms: float) -> dict[str, Any]:
     Agno returns a Judgement when the model answered valid JSON for the schema; anything else is a parse error row with the first 200
     characters of the text (an error row, not a crash). `usage` is `RunMetrics.to_dict()`, whatever the provider filled: tokens, cache
     reads, reasoning tokens, Agno's own duration and time to first token; the metrics price it offline.
+
+    Args:
+        run: Agno's output of the Agent run.
+        latency_ms: the wall-clock time of `Agent.run`, in milliseconds.
+
+    Returns:
+        The row fields `p_attack`, `category_pred`, `error`, `latency_ms`, `usage` and `raw`.
     """
     content: Any = run.content
     judged = isinstance(content, Judgement)

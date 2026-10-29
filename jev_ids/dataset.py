@@ -14,8 +14,8 @@ every Detector works with and which category is `benign`. Every CSV has `row_id`
 (0/1); a dataset with timestamps also has `end`, when the Flow ended, which orders the stream; extra columns are ignored. Nothing here knows
 a dataset by name: `scripts/prepare_<name>.py` converts the raw download into this shape, once, outside the package.
 
-Vocabulary follows CONTEXT.md: a Flow is one record of the dataset; an Example is a pool Flow shown to a Detector as reference, a role and
-not a separate type, so Examples are plain Flows here.
+Vocabulary follows CONTEXT.md. A Flow is one record of the dataset, and an Example is a pool Flow
+shown to a Detector as reference, a role and not a separate type, so Examples are plain Flows here.
 """
 
 import csv
@@ -30,7 +30,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-# The dataset card as a dict; see `load_config`.
+# Typing the dataset card as a dict, the shape `load_config` returns.
 Config = dict[str, Any]
 
 
@@ -67,6 +67,12 @@ def load_config(path: Path) -> Config:
 
     The package reads `name`, `features`, `symbolic`, `categories` and `benign`; `source` and `attack_names` are for the preparation script
     and the reader. The hash goes into config.json so a run can be traced to the exact card it used.
+
+    Args:
+        path: the card, `data/<name>/dataset.json`.
+
+    Returns:
+        The card's fields with `sha256` and `dir` added.
     """
     raw_bytes = path.read_bytes()
     config: Config = json.loads(raw_bytes)
@@ -78,8 +84,14 @@ def load_config(path: Path) -> Config:
 def flow_from_row(row: dict[str, str], config: Config) -> Flow:
     """One Flow from one CSV row; a category outside the card raises.
 
-    The features are joined in card order whatever the order of the file's columns, so every Detector sees the same `attributes_csv` for a
-    Flow.
+    The features are joined in card order whatever the file's column order, so every Detector sees the same `attributes_csv` for a Flow.
+
+    Args:
+        row: one row of a split or pool file, as `csv.DictReader` gives it.
+        config: the dataset card from `load_config`.
+
+    Returns:
+        The Flow the row describes.
     """
     category = row["category"]
     if category not in config["categories"]:
@@ -100,8 +112,8 @@ def load_split(path: Path, config: Config) -> list[Flow]:
         return [flow_from_row(row, config) for row in csv.DictReader(handle)]
 
 
-# How a Flow's values are written in the text a model reads: `full` as the CSV has them, the protocol of the first paper and of line 0;
-# `compact` with 4 significant digits (docs/jevids-design.md, D7). The forests always read the full values.
+# Listing how a Flow's values are written in the text a model reads, `full` as the CSV has them (the protocol of the first paper
+# and of line 0) or `compact` with 4 significant digits (docs/jevids-design.md, D7). The forests always read the full values.
 RECORDS = ("full", "compact")
 SIGNIFICANT_DIGITS = 4
 INTEGER = re.compile(r"-?\d+")
@@ -119,9 +131,15 @@ def record_text(flow: Flow, record: str) -> str:
 def compact_value(value: str) -> str:
     """One value with 4 significant digits and no exponent, so `25160.418777440053` becomes `25160` and `168.86187098953056` `168.9`.
 
-    An integer stays as it is, whatever its length: a port such as `44321` is a name more than a size, and rounding `20694308` to
-    `20690000` would not shorten it. A value that is not a finite number (NSL-KDD's `tcp`, `inf`, `nan`) stays as it is too. A decimal
-    with an integer value loses its `.0`: `0.0` becomes `0`.
+    An integer stays as it is, whatever its length, because a port such as `44321` is a name more than a size and
+    rounding `20694308` to `20690000` would not shorten it. A value that is not a finite number
+    (NSL-KDD's `tcp`, `inf`, `nan`) stays as it is too. A decimal with an integer value loses its `.0`, so `0.0` becomes `0`.
+
+    Args:
+        value: one feature value, as the CSV has it.
+
+    Returns:
+        The value as the `compact` record writes it.
     """
     if INTEGER.fullmatch(value):
         return value
@@ -146,8 +164,15 @@ def category_by_name(config: Config) -> dict[str, str]:
 def split_header(config: Config, *extra: str) -> list[str]:
     """The column names every split and pool file starts with, plus any trace column.
 
-    The writers of this shape (the preparation scripts and the test builder) differ only in the trace columns they append, so the
-    shared part is named here, beside the docstring that defines it.
+    The writers of this shape (the preparation scripts and the test builder) differ only in the trace
+    columns they append, so the shared part is named here, beside the docstring that defines it.
+
+    Args:
+        config: the dataset card, whose `features` give the feature columns.
+        *extra: the trace columns to append after `novel_attack`.
+
+    Returns:
+        The header row.
     """
     return ["row_id", *config["features"], "category", "novel_attack", *extra]
 

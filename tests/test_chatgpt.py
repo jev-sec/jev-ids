@@ -29,7 +29,7 @@ def store_at(tmp_path: Path, expires_at: float) -> chatgpt.TokenStore:
                 "access_token": "old",
                 "refresh_token": "r1",
                 "expires_at": expires_at,
-            }  # noqa: S105
+            }
         )
     )
     return chatgpt.TokenStore(path)
@@ -60,8 +60,18 @@ def test_expired_token_is_refreshed_and_saved(tmp_path: Path, monkeypatch: pytes
     seen: list[dict[str, Any]] = []
 
     def fake_post(_url: str, *, data: dict[str, Any], headers: dict[str, str], timeout: int) -> FakeResponse:
-        seen.append({"data": data, "headers": headers, "timeout": timeout})
-        return FakeResponse(200, {"access_token": new_token, "refresh_token": "r2"})  # noqa: S105
+        seen.append(
+            {
+                "data": data,
+                "headers": headers,
+                "timeout": timeout,
+            }
+        )
+        tokens = {
+            "access_token": new_token,
+            "refresh_token": "r2",
+        }
+        return FakeResponse(200, tokens)
 
     monkeypatch.setenv(chatgpt.CLIENT_ID_VAR, "client-123")
     monkeypatch.setattr(requests, "post", fake_post)
@@ -72,7 +82,7 @@ def test_expired_token_is_refreshed_and_saved(tmp_path: Path, monkeypatch: pytes
     assert seen[0]["data"]["grant_type"] == "refresh_token"
     assert seen[0]["data"]["client_id"] == "client-123"
     saved = json.loads(store.path.read_text())
-    assert saved["refresh_token"] == "r2"  # noqa: S105
+    assert saved["refresh_token"] == "r2"  # noqa: S105  a fake token made up by this test
     assert saved["expires_at"] == 1_900_000_000.0
     assert oct(store.path.stat().st_mode & 0o777) == "0o600"
 
@@ -100,7 +110,7 @@ def test_model_injects_the_preamble_and_the_token(tmp_path: Path) -> None:
     assert model.store is False
     assert model.include == ["reasoning.encrypted_content"]
     assert model.request_params == {"instructions": chatgpt.PREAMBLE}
-    params = model._get_client_params()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    params = model._get_client_params()  # pyright: ignore[reportPrivateUsage]  the hook Agno calls by its private name
     assert params["api_key"] == "old"
     assert params["base_url"] == chatgpt.BACKEND_BASE_URL
 

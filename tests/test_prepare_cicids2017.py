@@ -17,9 +17,12 @@ CARD = {
     "symbolic": ["Protocol"],
     "categories": ["BENIGN", "DoS", "BruteForce"],
     "benign": "BENIGN",
-    "attack_names": {"DoS": ["DoS Hulk", "DoS Slowhttptest"], "BruteForce": ["FTP-Patator"]},
+    "attack_names": {
+        "DoS": ["DoS Hulk", "DoS Slowhttptest"],
+        "BruteForce": ["FTP-Patator"],
+    },
 }
-# Per day, the labels of its lines in file order; line i of a day has timestamp 2017-07-0d 10:00:i and Flow Duration i.
+# Listing the labels of each day's lines in file order. Line i of a day has timestamp 2017-07-0d 10:00:i and Flow Duration i.
 DAYS = {
     "monday": ["BENIGN"] * 4,
     "tuesday": ["FTP-Patator", "BENIGN", "FTP-Patator", "FTP-Patator - Attempted", "FTP-Patator", "BENIGN"],
@@ -76,7 +79,7 @@ def test_prepare_puts_the_earlier_half_of_each_day_in_the_pool_and_respects_the_
     for label in ("BENIGN", "FTP-Patator", "DoS Hulk"):
         assert sum(row["raw_label"] == label for row in pool) <= 2
         assert sum(row["raw_label"] == label for row in test) <= (3 if label == "BENIGN" else 2)
-    # Six DoS Hulk flows: three may become Examples, the cap keeps two.
+    # Checking the six DoS Hulk flows, of which three may become Examples and the cap keeps two.
     assert sum(row["raw_label"] == "DoS Hulk" for row in pool) == 2
 
 
@@ -84,7 +87,7 @@ def test_prepare_judges_benign_flows_on_every_day_they_occur(tmp_path: Path) -> 
     raw, out = write_raw(tmp_path, DAYS)
     prepare.prepare(raw, out, seed=1, caps=(prepare.Caps(9, 9), prepare.Caps(9, 9)))
     pool, test = read_rows(out / "pool.csv"), read_rows(out / "test.csv")
-    # One cut over all eight BENIGN flows would put Monday's four in the pool and judge none of them.
+    # Cutting each day on its own, because one cut over all eight BENIGN flows would put Monday's four in the pool and judge none of them.
     assert {row["day"] for row in pool if row["raw_label"] == "BENIGN"} == {"monday", "tuesday"}
     assert {row["day"] for row in test if row["raw_label"] == "BENIGN"} == {"monday", "tuesday", "thursday", "friday"}
 
@@ -94,11 +97,11 @@ def test_prepare_numbers_flows_across_days_and_keeps_the_trace(tmp_path: Path) -
     prepare.prepare(raw, out, seed=1, caps=(prepare.Caps(9, 9), prepare.Caps(9, 9)))
     rows = read_rows(out / "pool.csv") + read_rows(out / "test.csv")
     by_id = {int(row["row_id"]): row for row in rows}
-    # Tuesday's line 1 (BENIGN) comes after Monday's four lines.
+    # Numbering Tuesday's line 1 (BENIGN) after Monday's four lines.
     assert by_id[5]["day"] == "tuesday"
     assert by_id[5]["source_id"] == "2"
     assert by_id[5]["Flow Duration"] == "1"
-    # 10:00:01.5 plus a Flow Duration of 1 microsecond.
+    # Adding a Flow Duration of 1 microsecond to 10:00:01.5.
     assert by_id[5]["end"] == "2017-07-04T10:00:01.500001"
     assert "Src IP" not in by_id[5]
     source = json.loads((out / "splits" / "SOURCE.json").read_text(encoding="utf-8"))
@@ -125,7 +128,13 @@ def test_prepare_is_reproducible_and_keeps_the_drawn_splits(tmp_path: Path) -> N
 
 
 def test_prepare_rejects_an_unknown_label_and_a_changed_header(tmp_path: Path) -> None:
-    raw, out = write_raw(tmp_path, {**DAYS, "friday": ["Ransomware"]})
+    raw, out = write_raw(
+        tmp_path,
+        {
+            **DAYS,
+            "friday": ["Ransomware"],
+        },
+    )
     with pytest.raises(ValueError, match="'Ransomware' is neither in the card nor dropped"):
         prepare.prepare(raw, out, seed=1)
     with zipfile.ZipFile(raw, "w") as archive:

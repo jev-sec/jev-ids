@@ -28,7 +28,7 @@ VOCABULARY = rf.vocabulary(TRAIN, CONFIG)
 
 def test_vocabulary_and_vector_shape() -> None:
     assert VOCABULARY == {1: ("icmp", "tcp", "udp")}
-    # The two numeric features in order, then one column per known value of `b`.
+    # Placing the two numeric features first, in order, then one column per known value of `b`.
     assert rf.feature_vector(TRAIN[4], VOCABULARY) == [8.0, 0.0, 1.0, 0.0, 0.0]
     unseen = rf.feature_vector(flow(99, "normal", "sctp", "1"), VOCABULARY)
     assert unseen == [1.0, 0.0, 0.0, 0.0, 0.0]
@@ -60,21 +60,13 @@ def test_fit_rejects_zero_shot() -> None:
         detector.predict(TRAIN[0], [])
 
 
-def test_the_encoder_encodes_each_flow_once_and_jobs_leave_the_forest_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_encoder_encodes_each_flow_once_and_jobs_leave_the_forest_unchanged() -> None:
     encoder = rf.Encoder(VOCABULARY)
     first = encoder.matrix(TRAIN)
     assert first.tolist() == [rf.feature_vector(flow, VOCABULARY) for flow in TRAIN]
-    encoded: list[int] = []
-    original = rf.feature_vector
-
-    def counted(flow: Flow, vocabulary: rf.Vocabulary) -> list[float]:
-        encoded.append(flow.row_id)
-        return original(flow, vocabulary)
-
-    monkeypatch.setattr(rf, "feature_vector", counted)
+    # Emptying the vocabulary, so a Flow encoded again would fail on its symbolic value and only the kept rows can answer.
+    encoder.vocabulary = {}
     assert encoder.matrix(TRAIN[::-1]).tolist() == first[::-1].tolist()
-    assert encoded == []
-    monkeypatch.undo()
     under_test = flow(99, "dos", "tcp", "5")
     answers = [rf.RandomForestDetector(VOCABULARY, "normal", jobs).predict(under_test, TRAIN) for jobs in (1, 2)]
     assert answers[0]["p_attack"] == answers[1]["p_attack"]

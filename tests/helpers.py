@@ -8,7 +8,7 @@ from typing import Any
 from jev_ids.dataset import Config, Flow, split_header, write_split
 from jev_ids.records import Prediction
 
-# A three-feature card with one symbolic feature and three Categories.
+# Defining a three-feature card with one symbolic feature and three Categories.
 CONFIG: Config = {
     "name": "test",
     "features": ["a", "b", "c"],
@@ -22,7 +22,7 @@ CATEGORIES = {
     "dos": "denial of service.",
     "probe": "surveillance or scanning.",
 }
-# What `run.load_prompt` returns for a `jev.json` and an `llm.md` written for CONFIG.
+# Mirroring what `run.load_prompt` returns for a `jev.json` and an `llm.md` written for `CONFIG`.
 JEV_PROMPT: dict[str, Any] = {
     "text": json.dumps(
         {
@@ -37,7 +37,10 @@ JEV_PROMPT: dict[str, Any] = {
                     "type": "noul",
                     "instructions": "Is `flows.under_test` bad?",
                 },
-                "category": {"type": "choice", "instructions": "Which category?"},
+                "category": {
+                    "type": "choice",
+                    "instructions": "Which category?",
+                },
             },
         }
     ),
@@ -71,9 +74,15 @@ def make_train(categories: Sequence[str]) -> list[Flow]:
 
 
 def write_dataset(root: Path, config: Config, splits: Mapping[str, Sequence[Flow]]) -> Path:
-    """A dataset folder under `root` in the shared shape; returns the card's path.
+    """A dataset folder under `root` in the shared shape.
 
-    `splits["pool"]` becomes `pool.csv`; every other entry becomes `splits/<name>.csv`.
+    Args:
+        root: The folder that receives the dataset folder.
+        config: The card, written as `dataset.json`.
+        splits: The Flows of each split. `splits["pool"]` becomes `pool.csv`, and every other entry becomes `splits/<name>.csv`.
+
+    Returns:
+        The card's path.
     """
     folder = root / config["name"]
     folder.mkdir(parents=True, exist_ok=True)
@@ -107,7 +116,10 @@ def make_prediction(row_id: int, is_attack: int, p_attack: float | None, **overr
         "novel_attack": False,
         "p_attack": p_attack,
         "latency_ms": 500.0,
-        "usage": {"input_tokens": 100, "output_tokens": 10},
+        "usage": {
+            "input_tokens": 100,
+            "output_tokens": 10,
+        },
         "retries": 0,
         "error": None,
         "request_id": f"q{row_id}",

@@ -43,8 +43,10 @@ class KNNDetector:
     """Judges a Flow by the Categories of its nearest Flows in the memory it is given."""
 
     name = "knn"
-    prompt_hash = None  # the vote reads no prompt
-    record = "full"  # it measures the values themselves, never rounded (D7)
+    # Storing no prompt hash, because the vote reads no prompt.
+    prompt_hash = None
+    # Measuring the values themselves, never rounded (D7).
+    record = "full"
 
     def __init__(self, space: Space, benign: str, neighbours: str) -> None:
         """Keep the space, the benign label and K.
@@ -63,6 +65,13 @@ class KNNDetector:
         """The K nearest Examples vote: the most frequent Category wins, a tie going to the Category of the nearest tied neighbour.
 
         Equal distances keep the memory's order. Latency covers the distances and the vote, not the encoding of the memory.
+
+        Args:
+            flow: the Flow to judge.
+            examples: the visible memory the neighbours come from.
+
+        Returns:
+            The row fields `p_attack`, `category_pred`, `neighbours` and `latency_ms`.
         """
         if not examples:
             raise ValueError("the kNN needs a memory to vote from: run it at k = all")

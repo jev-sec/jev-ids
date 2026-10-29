@@ -58,7 +58,8 @@ def test_instructions_fill_the_examples_placeholder_or_remove_it() -> None:
     assert text.startswith("You are given one record")
     assert "- `dos`:" in text
     assert "JSON" in text
-    assert text.count(" => ") == 4  # the header line plus three examples
+    # Counting the header line plus three examples.
+    assert text.count(" => ") == 4
     assert f"{TRAIN[1].attributes_csv} => dos" in text
     assert "{examples}" not in text
     zero_shot = llm.instructions(LLM_PROMPT["text"], [])
@@ -106,7 +107,11 @@ def test_happy_path_builds_one_agent_per_call_and_keeps_agno_metrics(
     assert prediction["latency_ms"] > 0
     assert prediction["error"] is None
     assert prediction["raw"] == {
-        "content": {"verdict": "attack", "category": "dos", "p_attack": 0.93},
+        "content": {
+            "verdict": "attack",
+            "category": "dos",
+            "p_attack": 0.93,
+        },
         "model": "deepseek-flash-2026",
     }
     assert (detector.name, detector.model) == ("llm:deepseek", "deepseek-flash")

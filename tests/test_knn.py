@@ -31,7 +31,7 @@ def test_parse_neighbours_reads_a_fixed_or_a_matched_k() -> None:
 
 def test_the_nearest_flows_vote_and_p_attack_is_their_attack_share() -> None:
     near_attack = detector("3").predict(make_flow(9, "dos", value="8"), MEMORY)
-    # Nearest: row 2 (8), then rows 3 and 4 (9), equally far, in memory order: two dos, one probe.
+    # Taking row 2 (8) first, then rows 3 and 4 (9), equally far, in memory order, so the vote is two dos and one probe.
     assert (near_attack["category_pred"], near_attack["p_attack"], near_attack["neighbours"]) == ("dos", 1.0, 3)
     near_normal = detector("2").predict(make_flow(9, "normal", value="1"), MEMORY)
     assert (near_normal["category_pred"], near_normal["p_attack"]) == ("normal", 0.0)
@@ -40,7 +40,7 @@ def test_the_nearest_flows_vote_and_p_attack_is_their_attack_share() -> None:
 
 
 def test_a_tie_goes_to_the_category_of_the_nearest_tied_neighbour() -> None:
-    # Distances from value 5 grow as 4.9, 5.2, 7, 7.2: two votes each, and the nearest decides.
+    # Ordering the neighbours of value 5 as 4.9, 5.2, 7 and 7.2, which gives two votes each, so the nearest decides.
     memory = [
         make_flow(0, "normal", value="7"),
         make_flow(1, "dos", value="5.2"),
@@ -56,7 +56,7 @@ def test_a_tie_goes_to_the_category_of_the_nearest_tied_neighbour() -> None:
 def test_matched_count_follows_the_selector() -> None:
     points = np.asarray([[0.0], [0.0], [1.0], [2.0], [3.0]])
     categories = ["normal", "normal", "dos", "dos", "probe"]
-    # normal: two copies, one distinct point; dos: two; probe: one; at k = 4 the Selector would give 1 + 2 + 1.
+    # Counting one distinct normal point (two copies), two dos points and one probe point, so at k = 4 the Selector would give 1 + 2 + 1.
     assert knn.matched_count(categories, points, 4) == 4
     assert knn.matched_count(categories, points, 1) == 3
     assert detector("matched:1").predict(make_flow(9, "dos", value="8"), MEMORY)["neighbours"] == 3

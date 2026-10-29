@@ -1,54 +1,51 @@
 """CLI wiring for the run, redo-errors, metrics, compare, sign-test and threshold subcommands."""
 
+import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 
 from jev_ids import cli, records, run
-from tests.helpers import make_prediction
+from tests.helpers import CONFIG, make_flow, make_prediction, make_train, write_dataset
 
 
 def test_missing_arguments_and_removed_commands_are_rejected() -> None:
     with pytest.raises(SystemExit):
         cli.main(["metrics"])
-    with pytest.raises(SystemExit):  # --dataset is required
+    # Leaving out `--dataset`, which `run` requires.
+    with pytest.raises(SystemExit):
         cli.main(["run", "--detector", "jev", "--split", "pilot"])
     for removed in ("download", "split"):
         with pytest.raises(SystemExit):
             cli.main([removed])
 
 
-def test_run_builds_a_spec_from_the_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
-    seen: list[run.RunSpec] = []
-
-    def fake_run(spec: run.RunSpec) -> Path:
-        seen.append(spec)
-        return Path("x")
-
-    monkeypatch.setattr(run, "run_from_spec", fake_run)
-    card = "data/x/dataset.json"
-    argv = ["run", "--dataset", card, "--detector", "random_forest", "--split", "smoke"]
-    argv += ["--k", "1,all", "--seeds", "1", "--reps", "3", "--model", "m", "--results-dir", "results/paper"]
+def test_run_builds_a_spec_from_the_arguments(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    splits = {
+        "pool": make_train(CONFIG["categories"]),
+        "smoke": [make_flow(9, "dos", value="1")],
+    }
+    card = write_dataset(tmp_path / "data", CONFIG, splits)
+    results = tmp_path / "results"
+    argv = ["run", "--dataset", str(card), "--detector", "random_forest", "--split", "smoke"]
+    argv += ["--k", "1,all", "--seeds", "1", "--reps", "3", "--model", "m", "--results-dir", str(results)]
     assert cli.main(argv) == 0
-    expected = run.RunSpec(
-        "random_forest", Path(card), "smoke", (1, None), (1,), reps=3, model_id="m", results_dir=Path("results/paper"), jobs=-1
-    )
-    assert seen == [expected]
-    argv = ["run", "--dataset", card, "--detector", "jev", "--split", "pilot"]
-    assert cli.main(argv) == 0
-    assert seen[1].k_values == (0, 1, 2, 4, 8)
-    assert seen[1].seeds == (0, 1, 2)
-    assert seen[1].model_id is None
-    assert seen[1].results_dir == run.RESULTS_DIR
-    redone: list[Path] = []
-    monkeypatch.setattr(run, "redo_errors", redone.append)
-    assert cli.main(["redo-errors", "results/paper/x"]) == 0
-    assert redone == [Path("results/paper/x")]
+    (run_dir,) = results.iterdir()
+    stored = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
+    expected = run.RunSpec("random_forest", card, "smoke", (1, None), (1,), reps=3, model_id="m", results_dir=results, jobs=-1)
+    assert stored["spec"] == json.loads(json.dumps(asdict(expected), default=str))
+    # Reading the defaults of a jev run from the parser `main` uses, because running Jev needs the network.
+    args = cli.build_parser().parse_args(["run", "--dataset", str(card), "--detector", "jev", "--split", "pilot"])
+    assert (args.k, args.seeds, args.model, args.results_dir) == ((0, 1, 2, 4, 8), (0, 1, 2), None, run.RESULTS_DIR)
+    # Completing the run in place, which judges nothing because it holds neither an error row nor a missing Flow.
+    assert cli.main(["redo-errors", str(run_dir)]) == 0
+    assert capsys.readouterr().out.splitlines()[-1] == f"redone: 0 error rows and 0 missing flows of {run_dir}"
 
 
 def test_metrics_prints_one_csv_over_every_run_given(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     records.append_prediction(tmp_path / "a", make_prediction(1, 1, 0.9))
-    # The second run reports one usage field the first lacks: the header is the union of the rows' keys, in order of first appearance.
+    # Giving the second run one usage field the first lacks, so the header is the union of the rows' keys, in order of first appearance.
     other = make_prediction(2, 0, 0.1, detector="random_forest", usage={"duration": 2.0})
     records.append_prediction(tmp_path / "b", other)
     assert cli.main(["metrics", str(tmp_path / "a"), str(tmp_path / "b")]) == 0
@@ -56,9 +53,9 @@ def test_metrics_prints_one_csv_over_every_run_given(tmp_path: Path, capsys: pyt
     assert lines[0].startswith("dataset,detector,model,split,delay,record,selection,control,beta,k,cells,flows,predictions,f1_mean,")
     assert lines[0].endswith(",cost_usd_per_1m,latency_ms_mean,latency_ms_median,latency_ms_p95,duration_mean")
     assert len(lines) == 3
-    # After recall_known come recall_dos, recall_known_dos and recall_novel_dos (the first run's only attack is a known dos), the alert
-    # counts, then the two areas, which a single-class cell leaves empty, then the error rate; the second run has no attack, so its
-    # category columns stay empty.
+    # Expecting `recall_dos`, `recall_known_dos` and `recall_novel_dos` after `recall_known`
+    # (the first run's only attack is a known dos), then the alert counts, then the two areas, which a single-class cell leaves empty,
+    # then the error rate. The second run has no attack, so its category columns stay empty.
     assert (
         lines[1]
         == "test,jev,m,internal,,full,random,fixed,,1,1,1,1,1.0,1.0,1.0,,1.0,,,1.0,1.0,,0.0,0.0,,,0.0,,100.0,10.0,,,,,500.0,500.0,,"
@@ -76,7 +73,7 @@ def test_compare_selects_the_subset_cuts_to_ks_and_prints_csv(tmp_path: Path, ca
     ]
     for prediction in [*a, *b]:
         records.append_prediction(tmp_path / prediction["detector"], prediction)
-    # Side B is two directories: one per k, as parallel runs write them.
+    # Splitting side B over two directories, one per k, as parallel runs write them.
     records.append_prediction(tmp_path / "jev-k0", make_prediction(0, 1, 0.0, novel_attack=True, k=0))
     argv = ["compare", "--a", str(tmp_path / "jev"), "--b", str(tmp_path / "jev"), str(tmp_path / "jev-k0")]
     argv += ["--subset", "novel", "--k-a", "1", "--k-b", "all"]
@@ -94,7 +91,7 @@ def test_sign_test_prints_every_subset_with_holm_p(tmp_path: Path, capsys: pytes
     assert cli.main(["sign-test", "--a", str(tmp_path / "a"), "--b", str(tmp_path / "b")]) == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "subset,k,flows,a_better,b_better,sign_p,holm_p"
-    # The known subset holds no flow, so only `all` and `novel` give a row, and Holm caps both adjusted p-values at 1.
+    # Skipping the known subset, which holds no flow, so only `all` and `novel` give a row, and Holm caps both adjusted p-values at 1.
     assert lines[1:] == ["all,1,1,1,0,1.0,1.0", "novel,1,1,1,0,1.0,1.0"]
     # Cutting B at 0.0 turns its miss into an alert, so the Flow ties and favours neither run.
     assert cli.main(["sign-test", "--a", str(tmp_path / "a"), "--b", str(tmp_path / "b"), "--threshold-b", "0.0"]) == 0

@@ -37,8 +37,8 @@ class Predictor(Protocol):
     def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]: ...  # noqa: D102  documented by each Detector
 
 
-# What gives a Flow its Examples at a step, with any extra fields for its row: the `Selector` since stage 3 (no extra field), with the
-# `KController` since stage 4 (the k of every Category); None in `stream_cell` falls back to the random draw of line 0.
+# Typing what gives a Flow its Examples at a step, with any extra fields for its row. It is the `Selector` from stage 3 (no extra field),
+# with the `KController` from stage 4 (the k of every Category), and None in `stream_cell` falls back to the random draw of line 0.
 Choose = Callable[["Memory", Flow, int], tuple[list[Flow], dict[str, Any]]]
 
 
@@ -70,7 +70,8 @@ class Memory:
         self._pool = {category: in_stream_order([flow for flow in pool if flow.category == category]) for category in self.categories}
         self._pool_ends = {category: [end_of(flow) for flow in flows] for category, flows in self._pool.items()}
         self.judged: list[tuple[Flow, Prediction]] = []
-        # row_id -> the row a judged Flow produced, for the `Selector`'s difficulty; row_ids are unique across the pool and the splits.
+        # Mapping each `row_id` to the row its judged Flow produced, for the
+        # `Selector`'s difficulty. A `row_id` is unique across the pool and the splits.
         self.rows: dict[int, Prediction] = {}
         self.names = dict(names or {})
 
@@ -107,6 +108,16 @@ def random_examples(memory: Memory, flow: Flow, step: int, k: Mapping[str, float
     A fixed k gives every Category the same count (line 0), and the `KController` gives each its own
     (the ablation without the `Selector`). The draw is seeded by the seed, the Flow and the Category,
     so a cell can be replayed, and shuffled once more so no Detector sees the Examples grouped by Category.
+
+    Args:
+        memory: the labeled Flows the step may use.
+        flow: the Flow to judge.
+        step: the position of `flow` in the stream.
+        k: the Examples wanted per Category, rounded up when fractional.
+        seed: the cell's seed.
+
+    Returns:
+        The drawn Examples, shuffled.
     """
     chosen: list[Flow] = []
     for category in memory.categories:
@@ -123,7 +134,7 @@ def split_names(path: Path) -> dict[int, str]:
         return {int(row["row_id"]): row["raw_label"] for row in csv.DictReader(handle) if row.get("raw_label")}
 
 
-def stream_cell(  # noqa: PLR0913, PLR0917 - the cell's fields plus the hook that gives its Examples
+def stream_cell(  # noqa: PLR0913, PLR0917  the cell's fields plus the hook that gives its Examples
     run_dir: Path,
     detector: Predictor,
     memory: Memory,
@@ -133,11 +144,19 @@ def stream_cell(  # noqa: PLR0913, PLR0917 - the cell's fields plus the hook tha
 ) -> None:
     """One cell: every Flow in stream order, its Examples from the memory, one call and one appended row, then the progress line.
 
-    `cell["k"]` is k Examples per Category for Jev, or None for a forest, which gets the whole memory and refits on it at every step; a
-    refit every 100 steps was tried first and left the forests days behind on the pilot (docs/jevids-design.md, "Changes after results").
-    A novel attack's row says whether it met its attack name for the first time (`first_contact`): no Flow of that name had come back yet.
-    `choose`, when given, replaces the random draw for Jev (the `Selector`, stage 3, and its `KController`, stage 4) and may add fields
-    to the row.
+    A novel attack's row says in `first_contact` whether it met its attack
+    name for the first time, when no Flow of that name had come back yet.
+
+    Args:
+        run_dir: the run's folder, where each row is appended.
+        detector: the Detector that judges each Flow.
+        memory: the labeled Flows, which grow as the judged Flows come back.
+        flows: the split to judge, in any order.
+        cell: the cell's fields, copied into every row. Its `k` is k Examples per Category for Jev, or None for
+            a forest, which gets the whole memory and refits on it at every step. A refit every 100 steps was tried
+            first and left the forests days behind on the pilot (docs/jevids-design.md, "Changes after results").
+        choose: when given, replaces the random draw for Jev and may add fields to the row.
+            It is the `Selector` (stage 3) and its `KController` (stage 4).
     """
     errors = 0
     for step, flow in enumerate(in_stream_order(flows)):
@@ -148,7 +167,13 @@ def stream_cell(  # noqa: PLR0913, PLR0917 - the cell's fields plus the hook tha
             examples = random_examples(memory, flow, step, dict.fromkeys(memory.categories, float(cell["k"])), cell["seed"])
         else:
             examples = memory.everything(step, end_of(flow))
-        fields = {**cell, **extra, "step": step, "n_examples": len(examples), "first_contact": memory.first_contact(flow, step)}
+        fields = {
+            **cell,
+            **extra,
+            "step": step,
+            "n_examples": len(examples),
+            "first_contact": memory.first_contact(flow, step),
+        }
         prediction = complete_prediction(detector.predict(flow, examples), flow, fields)
         append_prediction(run_dir, prediction)
         memory.add(flow, prediction)

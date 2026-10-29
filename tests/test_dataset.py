@@ -25,14 +25,14 @@ def test_load_split_round_trips_flows_in_card_order(tmp_path: Path) -> None:
     flows = [make_flow(0, "normal"), make_flow(7, "dos", value="3", novel_attack=True)]
     config = dataset.load_config(write_dataset(tmp_path, CONFIG, {"pool": flows}))
     assert dataset.load_split(config["dir"] / "pool.csv", config) == flows
-    # Columns are read by name and joined in card order; extra ones are ignored.
+    # Reading the columns by name and joining them in card order, ignoring the extra ones.
     path = tmp_path / "shuffled.csv"
     header = ["c", "novel_attack", "row_id", "b", "category", "a", "difficulty"]
     dataset.write_split(path, header, [["z", "1", "4", "y", "probe", "x", "21"]])
     (flow,) = dataset.load_split(path, config)
     assert flow == dataset.Flow(4, "x,y,z", "probe", is_attack=True, novel_attack=True)
     assert flow.attribute_values == ("x", "y", "z")
-    # A dataset with timestamps adds `end`, when the Flow ended.
+    # Adding `end`, when the Flow ended, for a dataset with timestamps.
     dataset.write_split(path, [*SHARED_HEADER, "end"], [[5, "x", "y", "z", "normal", "0", "2017-07-04T10:00:01.500001"]])
     (flow,) = dataset.load_split(path, config)
     assert flow.end == datetime(2017, 7, 4, 10, 0, 1, 500001)
@@ -69,7 +69,7 @@ def test_the_nsl_kdd_card_maps_every_attack_name() -> None:
 
 
 def test_compact_value_keeps_four_significant_digits_and_the_order_of_magnitude() -> None:
-    # Large and small values keep their order of magnitude, the proof of stage 2 (docs/jevids-design.md, D7), and never get an exponent.
+    # Keeping the order of magnitude of large and small values without an exponent, the proof of stage 2 (docs/jevids-design.md, D7).
     cases = {
         "25160.418777440053": "25160",
         "168.86187098953056": "168.9",

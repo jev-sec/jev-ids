@@ -61,7 +61,8 @@ def main() -> None:
         raise ValueError(f"{len(drawn)} rows drawn, {novel_rows} novel attacks; asked {args.size} with at least {args.min_novel} novel")
     write_split(args.dataset / "splits" / f"{args.name}.csv", header, drawn)
 
-    # The manifest keeps the sizes and novel counts of every split, plus how this one was drawn, so the draw can be audited and repeated.
+    # Keeping in the manifest the sizes and novel counts of every split,
+    # plus how this one was drawn, so the draw can be audited and repeated.
     manifest_path = args.dataset / "splits" / "SOURCE.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["sizes"][args.name] = len(drawn)

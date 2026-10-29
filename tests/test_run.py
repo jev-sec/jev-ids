@@ -42,7 +42,10 @@ class FakeDetector(jev.JevDetector):
             "p_attack": float(flow.is_attack),
             "category_pred": flow.category,
             "latency_ms": 1.0,
-            "usage": {"input_tokens": 10, "output_tokens": 1},
+            "usage": {
+                "input_tokens": 10,
+                "output_tokens": 1,
+            },
             "raw": {"echo": flow.row_id},
         }
 
@@ -50,7 +53,14 @@ class FakeDetector(jev.JevDetector):
 @pytest.fixture
 def card(tmp_path: Path) -> Path:
     """A dataset on disk: TRAIN is the pool and FLOWS the `smoke` split."""
-    return write_dataset(tmp_path / "data", CONFIG, {"pool": TRAIN, "smoke": FLOWS})
+    return write_dataset(
+        tmp_path / "data",
+        CONFIG,
+        {
+            "pool": TRAIN,
+            "smoke": FLOWS,
+        },
+    )
 
 
 def smoke_spec(
@@ -80,19 +90,21 @@ def test_execute_covers_every_cell_in_order_and_writes_the_three_files(card: Pat
 
     predictions = records.read_predictions(run_dir)
     assert len(predictions) == 2 * 1 * 2 * 3
-    # k outermost, then rep, then the Flows; 3 Examples at k = 1.
+    # Expecting k outermost, then rep, then the Flows, with 3 Examples at k = 1.
     zero_shot = [(100, 0), (101, 0), (102, 0)]
     one_shot = [(100, 3), (101, 3), (102, 3)]
     assert detector.calls == zero_shot * 2 + one_shot * 2
-    assert {p["n_examples"] for p in predictions} == {0, 3}
+    assert {prediction["n_examples"] for prediction in predictions} == {0, 3}
     shared = {
         *("run_id", "dataset", "detector", "model", "split", "prompt_hash", "record", "selection", "control", "beta"),
         *("k", "seed", "repetition", "n_examples", "row_id", "is_attack", "classification_verdict"),
         *("category_true", "novel_attack", "p_attack", "category_pred"),
         *("latency_ms", "usage", "request_id", "ts_utc"),
     }
-    assert all(set(p) == shared for p in predictions)
-    assert {(p["dataset"], p["detector"], p["prompt_hash"], p["record"]) for p in predictions} == {("test", "fake", "h", "compact")}
+    assert all(set(prediction) == shared for prediction in predictions)
+    assert {
+        (prediction["dataset"], prediction["detector"], prediction["prompt_hash"], prediction["record"]) for prediction in predictions
+    } == {("test", "fake", "h", "compact")}
     assert run_dir.name.endswith("-test-fake-smoke")
     responses = (run_dir / "responses.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(responses) == len(predictions)
@@ -101,68 +113,65 @@ def test_execute_covers_every_cell_in_order_and_writes_the_three_files(card: Pat
     assert config_json["spec"]["k_values"] == [0, 1]
     assert config_json["spec"]["record"] == "compact"
     assert config_json["spec"]["dataset"] == str(card)
-    assert config_json["dataset"] == {"name": "test", "sha256": config["sha256"]}
+    assert config_json["dataset"] == {
+        "name": "test",
+        "sha256": config["sha256"],
+    }
     split_sha256 = hashlib.sha256((card.parent / "splits" / "smoke.csv").read_bytes()).hexdigest()
-    assert config_json["split"] == {"name": "smoke", "sha256": split_sha256}
+    assert config_json["split"] == {
+        "name": "smoke",
+        "sha256": split_sha256,
+    }
     assert (config_json["model"], config_json["prompt_hash"]) == ("fake-1", "h")
-    # The full commit id, `-dirty` appended while the tree has uncommitted changes.
+    # Expecting the full commit id, with `-dirty` appended while the tree has uncommitted changes.
     assert re.fullmatch(r"[0-9a-f]{40}(-dirty)?", config_json["code_commit"])
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "k=0 seed=0 rep=0 flows=3 errors=0"
-    assert len(lines) == 4 + 1  # one line per cell, then `done:`
+    # Expecting one line per cell, then `done:`.
+    assert len(lines) == 4 + 1
 
 
-def test_redo_errors_judges_the_failed_and_the_missing_flows_in_their_cells(
-    card: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    class FlakyDetector(FakeDetector):
-        """Fails Flow 101 once, on every cell of the first pass, and answers from then on."""
-
-        def predict(self, flow: dataset.Flow, examples: Sequence[dataset.Flow]) -> dict[str, Any]:
-            if flow.row_id == 101 and (flow.row_id, len(examples)) not in self.calls:
-                self.calls.append((flow.row_id, len(examples)))
-                return {"error": "429 RESOURCE_EXHAUSTED"}
-            return super().predict(flow, examples)
-
-    detector = FlakyDetector()
-    config = dataset.load_config(card)
-    run_dir = run.execute(smoke_spec(card, k_values=(0, 1)), detector, config, FLOWS, TRAIN)
+def test_redo_errors_judges_the_failed_and_the_missing_flows_in_their_cells(card: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # Running the Random Forest, which `redo_errors` builds again from config.json without any network.
+    run_dir = run.run_from_spec(smoke_spec(card, "random_forest", k_values=(1, 2)))
     before = records.read_predictions(run_dir)
-    assert [(p["k"], p["row_id"]) for p in before if p.get("error")] == [(0, 101), (1, 101)]
-    # An interrupted run: the last Flow of the k = 1 cell was never judged.
-    interrupted = before[:-1]
-    (run_dir / "predictions.jsonl").write_text("".join(json.dumps(p) + "\n" for p in interrupted), encoding="utf-8")
-
-    def same_detector(spec: run.RunSpec, config: dataset.Config) -> run.Detector:
-        return detector
-
-    monkeypatch.setattr(run, "build_detector", same_detector)
+    # Turning both rows of Flow 101 into quota errors, then cutting the last row,
+    # as a run interrupted before the last Flow of the k = 2 cell would leave it.
+    failed = [prediction | {"error": "429 RESOURCE_EXHAUSTED"} if prediction["row_id"] == 101 else prediction for prediction in before]
+    interrupted = failed[:-1]
+    (run_dir / "predictions.jsonl").write_text("".join(json.dumps(prediction) + "\n" for prediction in interrupted), encoding="utf-8")
 
     assert run.redo_errors(run_dir) == run_dir
 
     after = records.read_predictions(run_dir)
-    # Six rows again, none with an error: the kept ones first, then the two redone and the one missing, in cell order and split order,
-    # with their cell's fields and the right number of Examples.
-    assert len(after) == len(before) and all(p.get("error") is None for p in after)
-    kept = [p for p in interrupted if not p.get("error")]
+    # Expecting six rows again, none with an error. The kept ones come first, then the two redone and the one missing,
+    # in cell order and split order, with their cell's fields and the right number of Examples.
+    assert len(after) == len(before) and all(prediction.get("error") is None for prediction in after)
+    kept = [prediction for prediction in interrupted if not prediction.get("error")]
     assert after[: len(kept)] == kept
     redone = after[len(kept) :]
-    expected = [(0, 101, 0, 1.0), (1, 101, 3, 1.0), (1, 102, 3, 1.0)]
-    assert [(p["k"], p["row_id"], p["n_examples"], p["p_attack"]) for p in redone] == expected
-    assert {(p["run_id"], p["dataset"], p["detector"], p["model"], p["split"], p["prompt_hash"]) for p in after} == {
-        (run_dir.name, "test", "fake", "fake-1", "smoke", "h")
+    expected = [(1, 101, 3), (2, 101, 6), (2, 102, 6)]
+    assert [(prediction["k"], prediction["row_id"], prediction["n_examples"]) for prediction in redone] == expected
+    # Expecting the original verdicts back, because the redo draws the original Examples and the forest has a fixed random_state.
+    assert [prediction["p_attack"] for prediction in redone] == [before[index]["p_attack"] for index in (1, 4, 5)]
+    run_fields = ("run_id", "dataset", "detector", "model", "split", "prompt_hash")
+    assert {tuple(prediction[field] for field in run_fields) for prediction in after} == {
+        (run_dir.name, "test", "random_forest", before[0]["model"], "smoke", None)
     }
-    assert detector.calls[-3:] == [(101, 0), (101, 3), (102, 3)]
     config_json = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     assert [(entry["error_rows"], entry["missing_flows"]) for entry in config_json["redone"]] == [(2, 1)]
     lines = capsys.readouterr().out.splitlines()
     assert lines[-3:] == [
-        "k=0 seed=0 rep=0 flows=1 errors=0",
-        "k=1 seed=0 rep=0 flows=2 errors=0",
+        "k=1 seed=0 rep=0 flows=1 errors=0",
+        "k=2 seed=0 rep=0 flows=2 errors=0",
         f"redone: 2 error rows and 1 missing flows of {run_dir}",
     ]
-    # Another model or prompt under the same run_id would mix two experiments.
-    detector.model = "fake-2"
+    # Refusing a run whose config.json names another model or prompt, because one run_id would then mix two experiments.
+    config_json |= {
+        "model": "fake-1",
+        "prompt_hash": "h",
+    }
+    (run_dir / "config.json").write_text(json.dumps(config_json), encoding="utf-8")
     with pytest.raises(ValueError, match="fake-1"):
         run.redo_errors(run_dir)
 
@@ -170,7 +179,7 @@ def test_redo_errors_judges_the_failed_and_the_missing_flows_in_their_cells(
 def test_predictions_carry_the_truth_and_the_verdict(card: Path) -> None:
     config = dataset.load_config(card)
     run_dir = run.execute(smoke_spec(card), FakeDetector(), config, FLOWS, TRAIN)
-    by_row = {p["row_id"]: p for p in records.read_predictions(run_dir)}
+    by_row = {prediction["row_id"]: prediction for prediction in records.read_predictions(run_dir)}
     assert (by_row[100]["is_attack"], by_row[100]["classification_verdict"]) == (0, 0)
     assert (by_row[101]["is_attack"], by_row[101]["classification_verdict"]) == (1, 1)
     assert (by_row[101]["category_true"], by_row[101]["novel_attack"]) == ("dos", True)
@@ -179,22 +188,23 @@ def test_predictions_carry_the_truth_and_the_verdict(card: Path) -> None:
 def test_run_from_spec_reads_the_dataset_and_fits_the_forest_on_the_pool(
     card: Path,
 ) -> None:
-    # End to end from disk with the one Detector that needs no network.
+    # Running end to end from disk with the one Detector that needs no network.
     run_dir = run.run_from_spec(smoke_spec(card, "random_forest", k_values=(1, None), reps=2))
     predictions = records.read_predictions(run_dir)
     assert len(predictions) == 2 * 2 * 3
-    assert {p["n_examples"] for p in predictions} == {3, len(TRAIN)}
-    assert {p["prompt_hash"] for p in predictions} == {None}
-    assert all(p["classification_verdict"] in (0, 1) for p in predictions)
-    assert all(p["train_time_ms"] > 0 for p in predictions)
-    assert not (run_dir / "responses.jsonl").exists()  # the forest has no raw answer
+    assert {prediction["n_examples"] for prediction in predictions} == {3, len(TRAIN)}
+    assert {prediction["prompt_hash"] for prediction in predictions} == {None}
+    assert all(prediction["classification_verdict"] in (0, 1) for prediction in predictions)
+    assert all(prediction["train_time_ms"] > 0 for prediction in predictions)
+    # Expecting no responses.jsonl, because the forest has no raw answer.
+    assert not (run_dir / "responses.jsonl").exists()
 
 
 def test_build_detector_knows_the_five_names(card: Path) -> None:
     config = dataset.load_config(card)
     forest = run.build_detector(run.RunSpec("random_forest", card, "smoke", (1,), (0,)), config)
     assert isinstance(forest, RandomForestDetector)
-    # Feature `b` sits at index 1; every TRAIN attribute equals its row index.
+    # Expecting feature `b` at index 1, where every TRAIN attribute equals its row index.
     assert forest.encoder.vocabulary == {1: ("0", "1", "2", "3", "4", "5")}
     assert forest.benign == "normal"
     isolation = run.build_detector(run.RunSpec("isolation_forest", card, "smoke", (None,), (0,)), config)
@@ -216,7 +226,7 @@ def test_build_detector_knows_the_five_names(card: Path) -> None:
 
 def test_run_dir_name_has_timestamp_dataset_detector_and_split(card: Path) -> None:
     run_dir = run.execute(smoke_spec(card, "llm:deepseek"), FakeDetector(), dataset.load_config(card), FLOWS, TRAIN)
-    # The colon of `llm:deepseek` is not a path character, so the name carries it as a dash.
+    # Expecting the colon of `llm:deepseek` as a dash in the name, because a colon is not a path character.
     assert re.fullmatch(r"\d{8}T\d{6}\.\d{6}Z-test-llm-deepseek-smoke", run_dir.name)
 
 
@@ -242,7 +252,7 @@ def test_sample_examples_is_balanced_nested_and_deterministic() -> None:
     assert run.sample_examples(TRAIN, 0, 0, CATEGORIES) == []
     with pytest.raises(ValueError, match="k = 3 asked"):
         run.sample_examples(TRAIN, 3, 0, CATEGORIES)
-    # A Category held out of the pool contributes no Examples.
+    # Drawing no Examples from a Category held out of the pool.
     assert run.sample_examples(TRAIN, 1, 0, [*CATEGORIES, "r2l"]) == k1
 
 
@@ -250,7 +260,10 @@ def test_load_prompt_hashes_the_bytes(tmp_path: Path) -> None:
     path = tmp_path / "p.md"
     path.write_bytes(b"abc")
     sha256 = hashlib.sha256(b"abc").hexdigest()
-    assert run.load_prompt(path) == {"text": "abc", "sha256": sha256}
+    assert run.load_prompt(path) == {
+        "text": "abc",
+        "sha256": sha256,
+    }
 
 
 @pytest.mark.parametrize("name", ["nsl-kdd", "cicids2017"])
@@ -261,9 +274,10 @@ def test_each_committed_prompt_pair_matches_its_card(name: str) -> None:
     assert list(body["state"]["categories"]) == config["categories"]
     assert body["state"]["columns"] == ",".join(config["features"])
     assert set(body["questions"]) == {"is_attack", "category"}
-    assert all("`flows.under_test`" in q["instructions"] for q in body["questions"].values())
+    assert all("`flows.under_test`" in question["instructions"] for question in body["questions"].values())
     text = run.load_prompt(ROOT / "prompts" / name / "llm.md")["text"]
-    # The same task text, Categories and columns reach every Detector; the Markdown layout around them belongs to the prompt's author.
+    # Checking that the same task text, Categories and columns reach every Detector.
+    # The Markdown layout around them belongs to the prompt's author.
     assert body["state"]["instructions"] in text
     assert all(f"- `{category}`:" in text for category in config["categories"])
     assert f"\n{body['state']['columns']}\n" in text
@@ -294,8 +308,8 @@ def test_a_stream_run_gives_jev_the_selector_s_examples(card: Path) -> None:
     run_dir = run.execute(spec, detector, dataset.load_config(card), flows, train)
     rows = records.read_predictions(run_dir)
     assert {(row["selection"], row["record"]) for row in rows} == {("score", "compact")}
-    # One Example per Category from the pool, then the returned Flows of each Category join the candidates.
-    assert [n for _, n in detector.calls] == [3, 3, 3]
+    # Expecting one Example per Category from the pool, then the returned Flows of each Category join the candidates.
+    assert [n_examples for _, n_examples in detector.calls] == [3, 3, 3]
     config_json = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     assert (config_json["spec"]["selection"], config_json["selection"]) == (None, "score")
 
@@ -332,4 +346,4 @@ def test_aimd_needs_a_stream_from_k_one_and_writes_k_per_category(card: Path, se
     assert {(row["control"], row["selection"], row["beta"]) for row in rows} == {("aimd", selection, 3.0)}
     # Expecting every k to stay at k_min = 1 and one Example per Category, because the fake detector is always right.
     assert all(set(row["k_by_category"].values()) == {1.0} for row in rows)
-    assert [n for _, n in detector.calls] == [3, 3, 3]
+    assert [n_examples for _, n_examples in detector.calls] == [3, 3, 3]

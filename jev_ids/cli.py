@@ -4,8 +4,8 @@ In reading order:
 
 - `parse_k` and `parse_list`: the list arguments (`--k 0,1,all`).
 - `build_parser`: the six subcommands and their arguments.
-- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`, `threshold_command`: one handler per
-  subcommand, each turning the parsed arguments into calls of `run` or `metrics`.
+- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`, `threshold_command`:
+  one handler per subcommand, each turning the parsed arguments into calls of `run` or `metrics`.
 - `read_runs`: the rows of the run directories given, cut again at a threshold when one is given.
 - `print_csv`: a table as CSV on stdout.
 - `main`: parse, dispatch, return the exit code.
@@ -36,8 +36,14 @@ def parse_k(text: str) -> int | None:
 def parse_list(text: str) -> tuple[int | None, ...]:
     """A comma-separated list of integers: `--k 0,1,2,all` and `--seeds 0,1,2`.
 
-    Both arguments are read the same way, so `all` is accepted for `--seeds` too, where it means nothing; nobody writes it and one parser is
-    worth that much looseness.
+    Both arguments are read the same way, so `all` is accepted for `--seeds` too,
+    where it means nothing. Nobody writes it, and one parser is worth that much looseness.
+
+    Args:
+        text: the argument as typed, such as `0,1,2,all`.
+
+    Returns:
+        One k per comma-separated part, None for `all`.
     """
     return tuple(parse_k(part) for part in text.split(","))
 
@@ -166,7 +172,7 @@ def compare_command(args: argparse.Namespace) -> None:
     if (args.k_a is None) != (args.k_b is None):
         raise SystemExit("--k-a and --k-b come together")
     across_k = None if args.k_a is None else (parse_k(args.k_a), parse_k(args.k_b))
-    # A detector may be spread over several run directories (one k each, run in parallel); each side is the union of its rows.
+    # Pooling the rows of each side, because a detector may be spread over several run directories (one k each, run in parallel).
     run_a = metrics.only_subset(read_runs(args.a, args.threshold_a), args.subset)
     run_b = metrics.only_subset(read_runs(args.b, args.threshold_b), args.subset)
     print_csv(metrics.compare(run_a, run_b, across_k))
@@ -176,7 +182,10 @@ def sign_test_command(args: argparse.Namespace) -> None:
     """`sign-test`: the flow-level sign test on all flows, known and novel attacks, with Holm's adjustment across every row, as CSV."""
     run_a, run_b = read_runs(args.a, args.threshold_a), read_runs(args.b, args.threshold_b)
     table = [
-        {"subset": subset, **row}
+        {
+            "subset": subset,
+            **row,
+        }
         for subset in ("all", "known", "novel")
         for row in metrics.sign_test(metrics.only_subset(run_a, subset), metrics.only_subset(run_b, subset))
     ]
@@ -200,8 +209,11 @@ def read_runs(run_dirs: Sequence[Path], threshold: float | None = None) -> list[
 def print_csv(rows: Sequence[dict[str, Any]]) -> None:
     """The rows as CSV on stdout, header first; nothing at all when there are none.
 
-    The header is every key any row has, in order of first appearance: the usage columns of a summary follow the Detectors present. CSV on
-    stdout: the user redirects it when a file is wanted.
+    The header is every key any row has, in order of first appearance, so the usage columns of a summary
+    follow the Detectors present. The CSV goes to stdout, and the user redirects it when a file is wanted.
+
+    Args:
+        rows: the table, one dict per row.
     """
     if not rows:
         return
@@ -213,7 +225,8 @@ def print_csv(rows: Sequence[dict[str, Any]]) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Load the secrets of `.env`, parse the command line and call the subcommand's handler."""
-    # The API keys live in `.env` and never in git (README); the console script and `python -m jev_ids` both pass through here.
+    # Loading the API keys from `.env`, which stays out of git (README),
+    # here because both the console script and `python -m jev_ids` pass through.
     load_dotenv(ROOT / ".env")
     args = build_parser().parse_args(argv)
     args.handler(args)

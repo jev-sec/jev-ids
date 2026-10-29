@@ -20,12 +20,14 @@ from jev_ids.stream import Memory
 # Naming what `Controlled` asks for the Examples of one Flow, either `Selector.choose` or `random_examples` bound to the cell's seed.
 Pick = Callable[[Memory, Flow, int, Mapping[str, float]], list[Flow]]
 
-# The values of D5, fixed before any stream result.
+# Setting the values of D5, which were fixed before any stream result.
 K_START = 1.0
 K_MIN = 1.0
 K_MAX = 8.0
-BETA = 2.0  # multiplicative increase on error, varied over 1.5, 2 and 3 in stage 6's sensitivity check only
-ALPHA = 1.0  # additive decrease on success, spread over a window of k_c successes
+# Setting D5's multiplicative increase on error, varied over 1.5, 2 and 3 in stage 6's sensitivity check only.
+BETA = 2.0
+# Setting D5's additive decrease on success, spread over a window of k_c successes.
+ALPHA = 1.0
 
 
 class KController:
@@ -41,6 +43,9 @@ class KController:
 
         An error is `category_pred` differing from the true Category, and k never falls below K_MIN.
         A failed call (`error`) is ignored, because Jev gave no answer to judge.
+
+        Args:
+            row: a row whose label came back, with `category_true`, `category_pred` and, for a failed call, `error`.
         """
         if row.get("error") is not None:
             return

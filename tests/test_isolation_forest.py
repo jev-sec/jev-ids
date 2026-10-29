@@ -12,7 +12,7 @@ def flow(row_id: int, category: str, bytes_: str) -> Flow:
     return Flow(row_id, f"{bytes_},tcp,0", category, category != "normal")
 
 
-# Benign traffic sits between 300 and 331 bytes; the two attacks in the pool sit far below it.
+# Placing benign traffic between 300 and 331 bytes and the two attacks of the pool far below it.
 NORMALS = [flow(index, "normal", str(300 + index)) for index in range(32)]
 ATTACKS = [flow(32, "dos", "0"), flow(33, "probe", "2")]
 POOL = NORMALS + ATTACKS
@@ -31,7 +31,7 @@ def test_predict_fits_on_the_benign_examples_once_and_scores_the_far_flow_higher
     assert (detector.name, detector.model) == ("isolation_forest", f"sklearn-isolation-forest-{isolation_forest.N_ESTIMATORS}")
     assert detector.prompt_hash is None
     assert set(normal) == {"p_attack", "latency_ms", "train_flows", "train_time_ms"}
-    # Only the 32 benign Flows of the list were fitted on, whatever else it held.
+    # Fitting on the 32 benign Flows of the list alone, whatever else it held.
     assert normal["train_flows"] == 32
     assert 0.0 <= normal["p_attack"] < attack["p_attack"] <= 1.0
     assert normal["train_time_ms"] == second["train_time_ms"] > 0

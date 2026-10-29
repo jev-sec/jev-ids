@@ -5,11 +5,11 @@ In reading order:
 - `vocabulary`: the values every symbolic feature takes in the pool, so the one-hot encoding is fixed for the whole run.
 - `feature_vector`: one Flow as numbers, numeric features first, then one column per known symbolic value.
 - `Encoder`: Flows as a matrix, each Flow encoded once; both forests encode through it.
-- `RandomForestDetector`: `predict` fits one forest of 100 trees with a fixed seed per cell, on that cell's Examples and one class per
-  Category, then judges one Flow with it.
+- `RandomForestDetector`: `predict` fits one forest of 100 trees with a fixed seed per cell,
+  on that cell's Examples and one class per Category, then judges one Flow with it.
 
-`p_attack = 1 - P(benign)`, the Verdict is taken at the shared threshold like every Detector, and the training time is repeated in every row
-of the cell.
+`p_attack = 1 - P(benign)`, the Verdict is taken at the shared threshold like every Detector,
+and the training time is repeated in every row of the cell.
 """
 
 import time
@@ -17,24 +17,29 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from sklearn.ensemble import (  # pyright: ignore[reportMissingTypeStubs]
-    RandomForestClassifier,
-)
+from sklearn.ensemble import RandomForestClassifier  # pyright: ignore[reportMissingTypeStubs]  scikit-learn ships no type stubs
 
 from jev_ids.dataset import Config, Flow
 
 N_ESTIMATORS = 100
 RANDOM_STATE = 0
 
-# Feature index -> the sorted values it takes in the pool, one entry per symbolic feature, in card order.
+# Mapping a feature index to the sorted values it takes in the pool, one entry per symbolic feature, in card order.
 Vocabulary = dict[int, tuple[str, ...]]
 
 
 def vocabulary(flows: Sequence[Flow], config: Config) -> Vocabulary:
     """The sorted values of each symbolic feature of the card, by feature index.
 
-    Taken from the whole pool and not from the Examples of a cell, so that every cell of a run encodes a Flow the same way whatever k was
-    drawn.
+    Taken from the whole pool and not from the Examples of a cell,
+    so that every cell of a run encodes a Flow the same way whatever k was drawn.
+
+    Args:
+        flows: the pool.
+        config: the dataset card, which names the features and the symbolic ones.
+
+    Returns:
+        A `Vocabulary`, mapping each symbolic feature index to its sorted values.
     """
     indexes: list[int] = [config["features"].index(name) for name in config["symbolic"]]
     seen: dict[int, set[str]] = {index: set() for index in indexes}
@@ -48,8 +53,15 @@ def vocabulary(flows: Sequence[Flow], config: Config) -> Vocabulary:
 def feature_vector(flow: Flow, vocabulary: Vocabulary) -> list[float]:
     """The numeric features as floats, in order, then the symbolic ones one-hot.
 
-    A symbolic value absent from the pool becomes all zeros, the equivalent of scikit-learn's `handle_unknown="ignore"`, so a split Flow
-    never breaks the forest.
+    A symbolic value absent from the pool becomes all zeros, the equivalent of
+    scikit-learn's `handle_unknown="ignore"`, so a split Flow never breaks the forest.
+
+    Args:
+        flow: the Flow to encode.
+        vocabulary: the symbolic values of the pool (see `vocabulary`).
+
+    Returns:
+        The Flow as one row of floats.
     """
     values = flow.attribute_values
     numeric = [float(value) for index, value in enumerate(values) if index not in vocabulary]
@@ -86,8 +98,10 @@ class RandomForestDetector:
     """Judges Flows with a RandomForestClassifier fitted on the cell's Examples."""
 
     name = "random_forest"
-    prompt_hash = None  # the forest reads no prompt
-    record = "full"  # the forest reads the values themselves, never rounded (docs/jevids-design.md, D7)
+    # Storing no prompt hash, because the forest reads no prompt.
+    prompt_hash = None
+    # Feeding the forest the values themselves, never rounded (docs/jevids-design.md, D7).
+    record = "full"
 
     def __init__(self, vocabulary: Vocabulary, benign: str, jobs: int = 1) -> None:
         """Keep the encoding and the benign label; fitting waits for `predict`.
@@ -95,16 +109,16 @@ class RandomForestDetector:
         Args:
             vocabulary: the symbolic values of the pool (see `vocabulary`).
             benign: the card's benign category, whose probability gives p_attack.
-            jobs: CPU cores a fit may use, scikit-learn's `n_jobs` (-1 for all); the fixed random_state makes the forest the same for any
-                value.
+            jobs: CPU cores a fit may use, scikit-learn's `n_jobs` (-1 for all).
+                The fixed `random_state` makes the forest the same for any value.
         """
         self.encoder = Encoder(vocabulary)
         self.benign = benign
         self.jobs = jobs
         self.model = f"sklearn-random-forest-{N_ESTIMATORS}"
         self.fit_count = 0
-        # The run loop hands the same Examples list to every rep of a cell, so the forest is fitted once per list (by identity) and
-        # the training time is repeated in every row of that cell.
+        # Fitting the forest once per Examples list (by identity), since the run loop hands the same list
+        # to every rep of a cell, and repeating the training time in every row of that cell.
         self._fitted_on_examples_id: int | None = None
         self._forest: Any = None
         self._train_time_ms = 0.0
@@ -112,8 +126,15 @@ class RandomForestDetector:
     def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]:
         """One Flow: p_attack = 1 - P(benign), the most probable Category, timings.
 
-        A cell's first Flow fits a fresh forest on the Examples, labeled by Category, and times the fit; the rest of the cell reuses it.
-        Latency is the wall clock around `predict_proba` alone.
+        A cell's first Flow fits a fresh forest on the Examples, labeled by Category, and times the fit.
+        The rest of the cell reuses it. Latency is the wall clock around `predict_proba` alone.
+
+        Args:
+            flow: the Flow to judge.
+            examples: the cell's Examples, which train the forest.
+
+        Returns:
+            The row fields `p_attack`, `category_pred`, `latency_ms` and `train_time_ms`.
         """
         if self._fitted_on_examples_id != id(examples):
             if not examples:

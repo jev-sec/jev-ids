@@ -22,9 +22,9 @@ from jev_ids.detectors.random_forest import Encoder, Vocabulary
 from jev_ids.records import Prediction
 from jev_ids.stream import Memory, end_of
 
-# λ of MMR: half the weight on the score, half on not repeating what was already chosen; fixed in D6, not tuned.
+# Weighting MMR with λ, half on the score and half on not repeating what was already chosen, a value fixed in D6 and never tuned.
 LAMBDA = 0.5
-# Difficulty of a Flow Jev never answered: a pool Flow, or a judged one whose call failed.
+# Scoring the difficulty of a Flow Jev never answered, a pool Flow or a judged one whose call failed.
 UNKNOWN_DIFFICULTY = 0.5
 
 
@@ -65,8 +65,14 @@ def unit_rank(values: np.ndarray) -> np.ndarray:
 def difficulty(row: Prediction | None) -> float:
     """1 when Jev got the Category wrong, 1 − |2·p_attack − 1| when right, 0.5 when Jev never answered (a pool Flow, a failed call).
 
-    Wrong means `category_pred` differs from the true Category, the same error the `KController` reacts to (D5). A confident error
-    scores 1, not 0, which is why a wrong answer is set apart from the formula.
+    Wrong means `category_pred` differs from the true Category, the same error the `KController` reacts to (D5).
+    A confident error scores 1, not 0, which is why a wrong answer is set apart from the formula.
+
+    Args:
+        row: the row Jev produced for the Flow, or None for a pool Flow.
+
+    Returns:
+        The difficulty, in [0, 1].
     """
     if row is None or row.get("error") is not None or row.get("p_attack") is None:
         return UNKNOWN_DIFFICULTY
@@ -85,8 +91,17 @@ class Selector:
     def choose(self, memory: Memory, flow: Flow, step: int, k: Mapping[str, float]) -> list[Flow]:
         """The Examples for `flow` at `step`: ceil(k[c]) per Category c, or fewer when the Category has fewer distinct candidates.
 
-        The final order is a shuffle seeded by the Flow alone, so no Detector sees the Examples grouped by Category and a repetition sees
-        the same request.
+        The final order is a shuffle seeded by the Flow alone, so no Detector sees
+        the Examples grouped by Category and a repetition sees the same request.
+
+        Args:
+            memory: the labeled Flows the step may use.
+            flow: the Flow to judge.
+            step: the position of `flow` in the stream.
+            k: the Examples wanted per Category, rounded up when fractional.
+
+        Returns:
+            The chosen Examples, shuffled.
         """
         target = self.space.points([flow])[0]
         chosen: list[Flow] = []
@@ -111,6 +126,14 @@ def mmr(points: np.ndarray, score: np.ndarray, count: int) -> list[int]:
 
     Redundancy is 1 / (1 + distance), in [0, 1]. A point at distance 0 from a chosen one, an exact copy, is never chosen: it would tell
     Jev nothing new and cost tokens, so a Category with only copies left gets fewer Examples. Ties go to the earlier index.
+
+    Args:
+        points: the candidates as standardised rows.
+        score: each candidate's similarity + recency + difficulty.
+        count: how many points to choose at most.
+
+    Returns:
+        The chosen indexes, in the order they were chosen.
     """
     redundancy = np.zeros(len(points))
     eligible = np.ones(len(points), dtype=bool)
