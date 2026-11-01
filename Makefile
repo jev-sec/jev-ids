@@ -71,53 +71,74 @@ paper-summary:
 
 # Stage 6 (docs/jevids-design.md, "Stage 6 in slots"): the paper split of CIC-IDS2017 read once, in 15 slots of 60 to 90 minutes,
 # each a chain of whole runs that needs nobody at the keyboard. A stream run cannot be redone (`redo-errors` refuses it), so a slot cut
-# midway loses the run it was in and keeps the finished ones. `make -k stage6-N` goes on to the next run when one fails, and caffeinate
-# keeps the Mac awake while a run lasts. The rule `stage6-<line>-d<D>` runs one line of the final table at the delay D.
+# midway loses the run it was in and keeps the finished ones. `make -k stage6-N` goes on to the next run when one fails, `make -k stage6`
+# runs every slot in order, and caffeinate keeps the Mac awake while a run lasts. A run that ends well leaves a stamp named after its line
+# and D in results/design-cicids2017/stage6-done/, and make skips every run whose stamp exists, so the same command resumes a cut chain
+# at the run that was cut.
 KEEP_AWAKE = $(if $(shell command -v caffeinate),caffeinate -i)
 STAGE6_RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/cicids2017/dataset.json --split paper \
   --results-dir results/design-cicids2017 --delay
 STAGE6_JEV = --detector jev --seeds 0,1,2
 STAGE6_ONCE = --k all --seeds 0
-.PHONY: $(addprefix stage6-,1 2 3 4 5 6 7 8 9 10 11 12 13 14 15)
+STAGE6_DONE = results/design-cicids2017/stage6-done
+# Withholding the stamp when any row of the run just made, the newest directory, holds an error, so the next `make -k stage6` runs it
+# again. Added on 2026-11-01, after the TypeSafe credits ran out in slot 7 and six runs of nothing but HTTP 402 rows were stamped.
+STAGE6_STAMP = ! grep -q '"error"' $$(ls -td results/design-cicids2017/*-paper | head -1)/predictions.jsonl && mkdir -p $(@D) && touch $@
+STAGE6_SLOTS = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+.PHONY: stage6 $(addprefix stage6-,$(STAGE6_SLOTS))
+
+stage6: $(addprefix stage6-,$(STAGE6_SLOTS))
 
 # Slots 1 to 4 at D = 1, 5 to 8 at D = 100, 9 to 12 at D = 500, then the β check at each D.
-stage6-1: stage6-full-d1 stage6-if-d1 stage6-knn4-d1 stage6-knnmatched-d1
-stage6-2: stage6-fixedk1-d1 stage6-rf-d1
-stage6-3: stage6-randomk4-d1 stage6-noctl-d1
-stage6-4: stage6-nosel-d1 stage6-nocompact-d1
-stage6-5: stage6-full-d100 stage6-if-d100 stage6-knn4-d100 stage6-knnmatched-d100
-stage6-6: stage6-fixedk1-d100 stage6-rf-d100
-stage6-7: stage6-randomk4-d100 stage6-noctl-d100
-stage6-8: stage6-nosel-d100 stage6-nocompact-d100
-stage6-9: stage6-full-d500 stage6-if-d500 stage6-knn4-d500 stage6-knnmatched-d500
-stage6-10: stage6-fixedk1-d500 stage6-rf-d500
-stage6-11: stage6-randomk4-d500 stage6-noctl-d500
-stage6-12: stage6-nosel-d500 stage6-nocompact-d500
-stage6-13: stage6-beta1.5-d1 stage6-beta3-d1
-stage6-14: stage6-beta1.5-d100 stage6-beta3-d100
-stage6-15: stage6-beta1.5-d500 stage6-beta3-d500
+stage6-1: $(addprefix $(STAGE6_DONE)/,full-d1 if-d1 knn4-d1 knnmatched-d1)
+stage6-2: $(addprefix $(STAGE6_DONE)/,fixedk1-d1 rf-d1)
+stage6-3: $(addprefix $(STAGE6_DONE)/,randomk4-d1 noctl-d1)
+stage6-4: $(addprefix $(STAGE6_DONE)/,nosel-d1 nocompact-d1)
+stage6-5: $(addprefix $(STAGE6_DONE)/,full-d100 if-d100 knn4-d100 knnmatched-d100)
+stage6-6: $(addprefix $(STAGE6_DONE)/,fixedk1-d100 rf-d100)
+stage6-7: $(addprefix $(STAGE6_DONE)/,randomk4-d100 noctl-d100)
+stage6-8: $(addprefix $(STAGE6_DONE)/,nosel-d100 nocompact-d100)
+stage6-9: $(addprefix $(STAGE6_DONE)/,full-d500 if-d500 knn4-d500 knnmatched-d500)
+stage6-10: $(addprefix $(STAGE6_DONE)/,fixedk1-d500 rf-d500)
+stage6-11: $(addprefix $(STAGE6_DONE)/,randomk4-d500 noctl-d500)
+stage6-12: $(addprefix $(STAGE6_DONE)/,nosel-d500 nocompact-d500)
+stage6-13: $(addprefix $(STAGE6_DONE)/,beta1.5-d1 beta3-d1)
+stage6-14: $(addprefix $(STAGE6_DONE)/,beta1.5-d100 beta3-d100)
+stage6-15: $(addprefix $(STAGE6_DONE)/,beta1.5-d500 beta3-d500)
 
-stage6-full-d%:
+$(STAGE6_DONE)/full-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd
-stage6-fixedk1-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/fixedk1-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1
-stage6-randomk4-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/randomk4-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 4 --selection random
-stage6-noctl-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/noctl-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 4
-stage6-nosel-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/nosel-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --selection random --control aimd
-stage6-nocompact-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/nocompact-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd --record full
-stage6-beta1.5-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/beta1.5-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd --beta 1.5
-stage6-beta3-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/beta3-d%:
 	$(STAGE6_RUN) $* $(STAGE6_JEV) --k 1 --control aimd --beta 3
-stage6-rf-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/rf-d%:
 	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector random_forest
-stage6-if-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/if-d%:
 	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector isolation_forest
-stage6-knn4-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/knn4-d%:
 	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours 4
-stage6-knnmatched-d%:
+	$(STAGE6_STAMP)
+$(STAGE6_DONE)/knnmatched-d%:
 	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours matched:4
+	$(STAGE6_STAMP)

@@ -17,7 +17,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
 | Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below           |
-| Stage 6                                 | In progress, plan in "Stage 6 in slots" below, no slot run yet          |
+| Stage 6                                 | In progress, plan in "Stage 6 in slots" below, slots 1 to 6 done        |
 
 ## Goal
 
@@ -281,6 +281,8 @@ The minutes come from the wall time per Flow measured before, 0.4 s for Jev and,
 - β runs at every D, so the check also covers the delays where the controller hears of its errors late.
 - The rows of a finished slot may be read before the next one starts. Nothing in this plan changes after such a reading, and a change would be logged in [Changes after results](#changes-after-results) with the result that prompted it.
 - A slot cut midway loses the run it was in, because a stream run cannot be redone. That run starts again from scratch, and its partial directory goes to the Trash so the metrics never read it.
+- Since 2026-11-01, after slot 1, `make -k stage6` runs every slot left in order. A run that ends well leaves a stamp in `results/design-cicids2017/stage6-done/`, and make skips each run that has one, so the same command resumes a cut chain. Slot 1 was stamped by hand after its four runs were checked complete (6,000 rows for Jev, 2,000 for each baseline, no error row).
+- On 2026-11-01 the TypeSafe credits ran out at 18:25 UTC, in the run of Jev at a random k = 4 at D = 100, and every later call failed with HTTP 402. That run and the next five runs of Jev went to the Trash with their stamps, and make runs them again. Since then a run with any error row gets no stamp.
 
 ## Notes for implementation
 
