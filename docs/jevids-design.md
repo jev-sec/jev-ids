@@ -17,7 +17,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
 | Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below           |
-| Stage 6                                 | In progress, plan in "Stage 6 in slots" below, slots 1 to 6 done        |
+| Stage 6                                 | In progress, slots 1 to 6 done, seeds per line since 2026-11-01 below   |
 
 ## Goal
 
@@ -283,6 +283,7 @@ The minutes come from the wall time per Flow measured before, 0.4 s for Jev and,
 - A slot cut midway loses the run it was in, because a stream run cannot be redone. That run starts again from scratch, and its partial directory goes to the Trash so the metrics never read it.
 - Since 2026-11-01, after slot 1, `make -k stage6` runs every slot left in order. A run that ends well leaves a stamp in `results/design-cicids2017/stage6-done/`, and make skips each run that has one, so the same command resumes a cut chain. Slot 1 was stamped by hand after its four runs were checked complete (6,000 rows for Jev, 2,000 for each baseline, no error row).
 - On 2026-11-01 the TypeSafe credits ran out at 18:25 UTC, in the run of Jev at a random k = 4 at D = 100, and every later call failed with HTTP 402. That run and the next five runs of Jev went to the Trash with their stamps, and make runs them again. Since then a run with any error row gets no stamp.
+- Since 2026-11-01, after slot 6, each Jev run holds one seed, and the seeds of every line and D are those of the table in [Changes after results](#changes-after-results), entry of 2026-11-01. Each stamp holds the name of its run's directory, so `results/design-cicids2017/stage6-done/` maps every line, D and seed to its run.
 
 ## Notes for implementation
 
@@ -516,3 +517,26 @@ the baseline of the `KController`, and runs in stage 6 on the paper split for ev
 errors, because it differs from the full system in that alone; the leave-one-out ablation without the `KController` (a fixed k = 4)
 measures what the controller saves, this baseline whether its reaction to errors improves detection. The AIMD itself stays as fixed in
 D5.
+
+### 2026-11-01: seed 0 alone for the ablations and the β check
+
+Seen: slots 1 to 6 had been run and read (D = 1 in full, and at D = 100 the full system, Jev at a fixed k = 1 and the four baselines) when the TypeSafe credits ran out. The 16 runs of Jev left at three seeds would cost about 16 USD by `prices.json`, and 6.60 USD were added. Across seeds 0 to 2 the F1 of every Jev line had a standard deviation of 0.007 at most. The change below was decided to fit the credits, after those results had been read.
+
+Changed:
+
+- Each Jev run holds one seed, and its stamp is `<line>-d<D>-s<seed>`. The stamps of the runs made before hold three seeds each, so their three stamps name the same directory.
+- The full system and Jev at a fixed k = 1 keep seeds 0 to 2 at every D, because they carry the central comparisons. The other Jev lines at D = 100 and 500 and the β check at every D run seed 0 alone (`STAGE6_FEW_SEEDS` in the `Makefile`). The 20 runs left come to about 5.75 USD by `prices.json`.
+- Seed 0 of Jev at a random k = 4 at D = 100 was taken back from the run the credits cut, `20261101T181110.948478Z-cicids2017-jev-paper`. Its 2,000 rows had no error, because the HTTP 402 rows began in seed 1 at step 1,448. Each cell starts a fresh memory, so the rows equal those of a run of seed 0 alone. Its `config.json` lists seed 0 and a `salvaged` entry with the seeds first run, and the whole original stays in the Trash.
+
+| Line                                        | D = 1   | D = 100            | D = 500 |
+| ------------------------------------------- | ------- | ------------------ | ------- |
+| Full system                                 | 0, 1, 2 | 0, 1, 2            | 0, 1, 2 |
+| Jev at a fixed k = 1                        | 0, 1, 2 | 0, 1, 2            | 0, 1, 2 |
+| Jev at a random k = 4                       | 0, 1, 2 | 0, taken back      | 0       |
+| Without the `KController` (fixed k = 4)     | 0, 1, 2 | 0                  | 0       |
+| Without the `Selector`                      | 0, 1, 2 | 0                  | 0       |
+| Without the compact record                  | 0, 1, 2 | 0                  | 0       |
+| β = 1.5 and β = 3                           | 0       | 0                  | 0       |
+| Random Forest, Isolation Forest, both kNN   | 0       | 0                  | 0       |
+
+Not changed: Jev IDS itself, its parameters, the lines, the delays and the order of the slots. The seeds set how precisely a line is measured, and Jev IDS performs the same with any of them. The runs at D = 1 keep their three seeds, every table reports its `cells`, and the McNemar test compares seed 0 at every D. `make -k stage6 STAGE6_FEW_SEEDS="0 1 2"` adds seeds 1 and 2 later and runs only the seeds still without a stamp.
