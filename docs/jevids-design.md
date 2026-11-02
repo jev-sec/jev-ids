@@ -6,19 +6,19 @@ value changed after a result has been seen is logged in [Changes after results](
 
 ## Status
 
-| Item                                    | State                                                                   |
-| --------------------------------------- | ----------------------------------------------------------------------- |
-| NF-UQ-NIDS-v2 removed                   | Done, commit `1197267`                                                  |
-| Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, replaced in stage 0 |
-| Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0        |
-| Stage 0                                 | Done, commit `3b011d8`                                                  |
-| Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                     |
-| Stage 2                                 | Done, commit `b1d7001`; line 1 below                                    |
-| Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
-| Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
-| Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below           |
-| Stage 6                                 | Slots 1 to 12 done, stopped in slot 13 (β) on 2026-11-02, see below     |
-| Stage 6 on `paper-v2`                   | Phase 1 read on 2026-11-02, 19 of 21 runs, change of 2026-11-02 below   |
+| Item                                    | State                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| NF-UQ-NIDS-v2 removed                   | Done, commit `1197267`                                                   |
+| Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, replaced in stage 0  |
+| Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0         |
+| Stage 0                                 | Done, commit `3b011d8`                                                   |
+| Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                      |
+| Stage 2                                 | Done, commit `b1d7001`; line 1 below                                     |
+| Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below              |
+| Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                     |
+| Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below            |
+| Stage 6                                 | Slots 1 to 12 done, stopped in slot 13 (β) on 2026-11-02, see below      |
+| Stage 6 on `paper-v2`                   | Phase 1 read, paper battery from 2026-11-02, changes of 2026-11-02 below |
 
 ## Goal
 
@@ -255,7 +255,7 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 - The validation stream from the pool is used for the threshold only. It holds no novel attacks, because novel attack names never
   enter the pool, so it cannot measure what matters most.
 - The `paper` split is read once, in stage 6.
-- The `paper-v2` split is read once, in the runs of the change of 2026-11-02 ([Changes after results](#changes-after-results)).
+- The `paper-v2` split is read by phase 1 and by the paper battery, the two changes of 2026-11-02 ([Changes after results](#changes-after-results)).
 - Every line reports recall on novel attacks separately, at first contact (a novel Flow judged before any Flow of its attack name has
   entered the memory) and after feedback.
 - The final ablation removes one component at a time from the full system, because components added one by one interact.
@@ -597,3 +597,17 @@ Phase 1, read on 2026-11-02. `make -k v2` ran from 04:39 to 07:01 UTC at commit 
 At D = 1 first contact covers one Flow per novel attack name, 3 in all. At D = 250 and 500 no Flow of a novel name came back before its last Flow in the stream, so all 293 novel attacks met Jev at first contact and the after-feedback column is empty. McNemar compares each seed of the full system with each baseline, Flow by Flow. At D = 1 the full system ties the Random Forest (p from 0.22 to 0.43) and kNN at k = 4 (p from 0.66 to 1), and it beats the matched kNN (p ≤ 2e-5) and the Isolation Forest. At D = 250 and 500 it beats every baseline in every seed with p ≤ 5e-5, and the Random Forest at D = 500 with p from 2.4e-8 to 1e-5. The rule for phase 2 is met at D = 500, in F1 (0.914 against 0.873) and in recall at a false positive rate of 1 % (0.931 against 0.890).
 
 The full system at D = 500 can be set beside stage 6 on the paper split (the `Selector` of D6) at the same cut of 0.58, but the Flows differ, so the comparison is unpaired. Its false alarms fell from 37 to 45 per seed to 4 to 6, and its novel recall fell too. `DoS Slowhttptest` was caught in 0.53 to 0.58 of its Flows against 0.95 to 0.98 (0.79 to 0.83 against 1.00 at 0.5), and in seeds 0 and 2 Jev named some of those Flows BENIGN. `Infiltration - Portscan` (0.29 to 0.31 against 0.36 to 0.37) and `SSH-Patator` (0.66 to 0.75 against 0.67 to 0.68) moved less. The middle half of each novel name's p_attack lies between 0.47 and 0.69 in every seed, around the cut, and at 0.5 the full system at D = 500 caught 0.943 to 0.948 of the attacks with 10 to 12 false alarms. The hypothesis is that the nearest benign Flow pulls this slow web attack toward BENIGN, and phase 2 tests it with V0 on `paper-v2`, the paired comparison. The cut stays at 0.58, as written before phase 1.
+
+### 2026-11-02: D from the bursts and the paper battery
+
+Seen: each novel attack name of `paper-v2` arrives in one burst. `SSH-Patator` holds stream positions 435 to 584, `DoS Slowhttptest` 782 to 898 and `Infiltration - Portscan` 1,344 to 1,515, so each burst spans 116 to 171 positions. At D = 250 and 500 no Flow of a novel name came back before its burst ended, so both delays measured Jev with no Example of the novel attack, and the Random Forest scored F1 0.872 and 0.873 at them. No run covered the delays shorter than a burst, where the Flows of a novel attack come back while it lasts. The TypeSafe credits left also call for fewer runs than phase 2 asked.
+
+Changed:
+
+- D takes 1, then 25, 50 and 100, all shorter than the shortest burst, and 200, longer than the longest. D = 200 is expected to match D = 250 and 500, and the runs of phase 1 at those delays are reported with it. The delays come from the bursts of `paper-v2`, the split they are measured on, and the paper says so.
+- The paper battery replaces phase 2 and runs at once, with no rule between them, at seed 0 only. The full system, the four baselines and the full system without the nearest benign Flow (V0, `--selection score`) run at every D. Jev without the `Selector`, at a fixed k = 1, at a fixed k = 4, with the full record and with random Examples at a fixed k = 4 run at D = 1, 50 and 200, and β = 1.5 and β = 3 at D = 200. The runs of phase 1 at D = 1 count.
+- `make -k v2-paper-jev` holds the 26 Jev runs, most important first, about 8.2 USD by `prices.json` and the tokens per Flow of stage 6. `make -k v2-paper-baselines` holds the 16 baseline runs, and the two chains may run at the same time.
+- Seeds 1 and 2 of any line can run later. With one seed, a gap in F1 below about 0.01 may come from the seed, since seeds 0 to 2 of the full system at D = 500 ranged from 0.911 to 0.920.
+- The full system at D = 250 keeps seed 0 alone, and seeds 1 and 2 there leave the plan.
+
+Not changed: Jev IDS, its parameters, the cut of 0.58, the metrics fixed before phase 1, the baselines of D10 and the runs of phase 1.

@@ -187,6 +187,17 @@ v2-d500: $(call v2_jev,full,500,0 1 2) $(addprefix $(V2_DONE)/,$(addsuffix -d500
 v2-phase2: $(foreach d,$(V2_DELAYS),$(call v2_jev,nonearest fixedk1,$(d),0 1 2) $(call v2_jev,randomk4 noctl nosel nocompact,$(d),0)) \
   $(call v2_jev,beta1.5 beta3,500,0)
 
+# Running the paper battery, which replaces phase 2 at seed 0 only (design document, "2026-11-02: D from the bursts and the paper
+# battery"). The Jev chain runs the full system at the new delays, V0 at every D, the other ablations at D = 1, 50 and 200 and β at
+# D = 200, in that order, so the runs that matter most come first if the credits run out. The runs of phase 1 at D = 1 count.
+V2_PAPER_DELAYS = 25 50 100 200
+V2_PAPER_ABLATIONS = nosel fixedk1 noctl nocompact randomk4
+.PHONY: v2-paper-jev v2-paper-baselines
+
+v2-paper-jev: $(foreach d,$(V2_PAPER_DELAYS),$(call v2_jev,full,$(d),0)) $(foreach d,1 $(V2_PAPER_DELAYS),$(call v2_jev,nonearest,$(d),0)) \
+  $(foreach line,$(V2_PAPER_ABLATIONS),$(foreach d,1 50 200,$(call v2_jev,$(line),$(d),0))) $(call v2_jev,beta1.5 beta3,200,0)
+v2-paper-baselines: $(foreach d,$(V2_PAPER_DELAYS),$(addprefix $(V2_DONE)/,$(addsuffix -d$(d),$(V2_BASELINES))))
+
 $(V2_DONE)/full-d%:
 	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd $(V2_ANCHOR)
 	$(call v2_stamp,jev)
