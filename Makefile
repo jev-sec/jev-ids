@@ -154,3 +154,75 @@ $(STAGE6_DONE)/knn4-d%:
 $(STAGE6_DONE)/knnmatched-d%:
 	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours matched:4
 	$(STAGE6_STAMP)
+
+# Stage 6 again, on the fresh split paper-v2 (docs/jevids-design.md, "2026-11-02: the nearest benign Flow and paper-v2"). The full
+# system now adds the nearest benign Flow to its Examples (`--selection score+nearest`), and D takes 1, 250 and 500. `make v2-cut` runs
+# the full system over the validation stream first, and `jev-ids threshold` takes the cut from its rows. `make -k v2` then runs phase 1,
+# one target per D, each with the full system at seeds 0 to 2 and the four baselines of D10. `make -k v2-phase2` runs the rest of the
+# battery and waits for the rule the design document fixes. Stamps go to results/design-cicids2017/v2-done/ and resume a cut chain as
+# in stage 6. Each stamp names the newest directory of its own Detector, so a Jev chain and a baseline chain may run at the same time.
+V2_RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/cicids2017/dataset.json --split paper-v2 \
+  --results-dir results/design-cicids2017 --delay
+V2_ANCHOR = --selection score+nearest
+V2_DONE = results/design-cicids2017/v2-done
+V2_DELAYS = 1 250 500
+# The stamps of the Jev lines in $(1) at the delay $(2), one per seed in $(3).
+v2_jev = $(foreach line,$(1),$(foreach seed,$(3),$(V2_DONE)/$(line)-d$(2)-s$(seed)))
+# Withholding the stamp when any row of the newest run of the Detector $(1) holds an error, as in stage 6.
+v2_stamp = run=$$(ls -td results/design-cicids2017/*-$(1)-paper-v2 | head -1) && ! grep -q '"error"' $$run/predictions.jsonl \
+  && mkdir -p $(@D) && basename $$run > $@
+V2_BASELINES = rf if knn4 knnmatched
+.PHONY: v2-cut v2 v2-phase2 $(addprefix v2-d,$(V2_DELAYS))
+
+v2-cut:
+	$(KEEP_AWAKE) uv run jev-ids run --dataset data/cicids2017/dataset.json --split validation \
+	  --results-dir results/design-cicids2017 --delay 1 --detector jev --k 1 --seeds 0,1,2 --control aimd $(V2_ANCHOR)
+
+v2: $(addprefix v2-d,$(V2_DELAYS))
+
+v2-d1: $(call v2_jev,full,1,0 1 2) $(addprefix $(V2_DONE)/,$(addsuffix -d1,$(V2_BASELINES)))
+v2-d250: $(call v2_jev,full,250,0 1 2) $(addprefix $(V2_DONE)/,$(addsuffix -d250,$(V2_BASELINES)))
+v2-d500: $(call v2_jev,full,500,0 1 2) $(addprefix $(V2_DONE)/,$(addsuffix -d500,$(V2_BASELINES)))
+
+v2-phase2: $(foreach d,$(V2_DELAYS),$(call v2_jev,nonearest fixedk1,$(d),0 1 2) $(call v2_jev,randomk4 noctl nosel nocompact,$(d),0)) \
+  $(call v2_jev,beta1.5 beta3,500,0)
+
+$(V2_DONE)/full-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd $(V2_ANCHOR)
+	$(call v2_stamp,jev)
+$(V2_DONE)/nonearest-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --selection score
+	$(call v2_stamp,jev)
+$(V2_DONE)/fixedk1-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 1 $(V2_ANCHOR)
+	$(call v2_stamp,jev)
+$(V2_DONE)/randomk4-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 4 --selection random
+	$(call v2_stamp,jev)
+$(V2_DONE)/noctl-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 4 $(V2_ANCHOR)
+	$(call v2_stamp,jev)
+$(V2_DONE)/nosel-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 1 --selection random --control aimd
+	$(call v2_stamp,jev)
+$(V2_DONE)/nocompact-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --record full $(V2_ANCHOR)
+	$(call v2_stamp,jev)
+$(V2_DONE)/beta1.5-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --beta 1.5 $(V2_ANCHOR)
+	$(call v2_stamp,jev)
+$(V2_DONE)/beta3-d%:
+	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --beta 3 $(V2_ANCHOR)
+	$(call v2_stamp,jev)
+$(V2_DONE)/rf-d%:
+	$(V2_RUN) $* $(STAGE6_ONCE) --detector random_forest
+	$(call v2_stamp,random_forest)
+$(V2_DONE)/if-d%:
+	$(V2_RUN) $* $(STAGE6_ONCE) --detector isolation_forest
+	$(call v2_stamp,isolation_forest)
+$(V2_DONE)/knn4-d%:
+	$(V2_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours 4
+	$(call v2_stamp,knn)
+$(V2_DONE)/knnmatched-d%:
+	$(V2_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours matched:4
+	$(call v2_stamp,knn)
