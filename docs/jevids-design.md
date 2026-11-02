@@ -17,7 +17,8 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below             |
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
 | Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below           |
-| Stage 6                                 | In progress, slots 1 to 6 done, seeds per line since 2026-11-01 below   |
+| Stage 6                                 | Slots 1 to 12 done, stopped in slot 13 (β) on 2026-11-02, see below     |
+| Stage 6 on `paper-v2`                   | Phase 1 from 2026-11-02, change of 2026-11-02 below                     |
 
 ## Goal
 
@@ -254,6 +255,7 @@ characters, no AI attribution). Lines 0 to 4 form the incremental table.
 - The validation stream from the pool is used for the threshold only. It holds no novel attacks, because novel attack names never
   enter the pool, so it cannot measure what matters most.
 - The `paper` split is read once, in stage 6.
+- The `paper-v2` split is read once, in the runs of the change of 2026-11-02 ([Changes after results](#changes-after-results)).
 - Every line reports recall on novel attacks separately, at first contact (a novel Flow judged before any Flow of its attack name has
   entered the memory) and after feedback.
 - The final ablation removes one component at a time from the full system, because components added one by one interact.
@@ -528,15 +530,44 @@ Changed:
 - The full system and Jev at a fixed k = 1 keep seeds 0 to 2 at every D, because they carry the central comparisons. The other Jev lines at D = 100 and 500 and the β check at every D run seed 0 alone (`STAGE6_FEW_SEEDS` in the `Makefile`). The 20 runs left come to about 5.75 USD by `prices.json`.
 - Seed 0 of Jev at a random k = 4 at D = 100 was taken back from the run the credits cut, `20261101T181110.948478Z-cicids2017-jev-paper`. Its 2,000 rows had no error, because the HTTP 402 rows began in seed 1 at step 1,448. Each cell starts a fresh memory, so the rows equal those of a run of seed 0 alone. Its `config.json` lists seed 0 and a `salvaged` entry with the seeds first run, and the whole original stays in the Trash.
 
-| Line                                        | D = 1   | D = 100            | D = 500 |
-| ------------------------------------------- | ------- | ------------------ | ------- |
-| Full system                                 | 0, 1, 2 | 0, 1, 2            | 0, 1, 2 |
-| Jev at a fixed k = 1                        | 0, 1, 2 | 0, 1, 2            | 0, 1, 2 |
-| Jev at a random k = 4                       | 0, 1, 2 | 0, taken back      | 0       |
-| Without the `KController` (fixed k = 4)     | 0, 1, 2 | 0                  | 0       |
-| Without the `Selector`                      | 0, 1, 2 | 0                  | 0       |
-| Without the compact record                  | 0, 1, 2 | 0                  | 0       |
-| β = 1.5 and β = 3                           | 0       | 0                  | 0       |
-| Random Forest, Isolation Forest, both kNN   | 0       | 0                  | 0       |
+| Line                                      | D = 1   | D = 100       | D = 500 |
+| ----------------------------------------- | ------- | ------------- | ------- |
+| Full system                               | 0, 1, 2 | 0, 1, 2       | 0, 1, 2 |
+| Jev at a fixed k = 1                      | 0, 1, 2 | 0, 1, 2       | 0, 1, 2 |
+| Jev at a random k = 4                     | 0, 1, 2 | 0, taken back | 0       |
+| Without the `KController` (fixed k = 4)   | 0, 1, 2 | 0             | 0       |
+| Without the `Selector`                    | 0, 1, 2 | 0             | 0       |
+| Without the compact record                | 0, 1, 2 | 0             | 0       |
+| β = 1.5 and β = 3                         | 0       | 0             | 0       |
+| Random Forest, Isolation Forest, both kNN | 0       | 0             | 0       |
 
 Not changed: Jev IDS itself, its parameters, the lines, the delays and the order of the slots. The seeds set how precisely a line is measured, and Jev IDS performs the same with any of them. The runs at D = 1 keep their three seeds, every table reports its `cells`, and the McNemar test compares seed 0 at every D. `make -k stage6 STAGE6_FEW_SEEDS="0 1 2"` adds seeds 1 and 2 later and runs only the seeds still without a stamp.
+
+### 2026-11-02: the nearest benign Flow and paper-v2
+
+Seen: slots 1 to 12 of stage 6 had been run and read, and slot 13 stopped at 1,756 of 2,000 Flows of β = 1.5 at D = 1 for a reason not found (no process alive, no sleep logged). Read at 0.5, the full system at D = 500 raised about 90 false alarms per seed. About three quarters of them were benign TCP Flows to port 80 or 443, and Jev named 71 % of them DoS. A replay of the logged answers with no call rebuilt every request of the full system (0 mismatches in k and in the number of Examples) and found where they came from. Benign web Flows were flagged in 5 % of the requests that showed only benign Examples and in 28 % of those that showed a DoS Example. The benign Example shown next to a false alarm lay at a median distance of 4.28 from it, while the nearest benign Flow in memory lay at 0.64, and 363 benign Flows on average were nearer than the one shown. Similarity enters the score as a rank among about 32,000 benign candidates, and the 400 nearest all score about 0.99, so recency and difficulty chose the benign Example. The `KController` and D did not explain the false alarms, and 26 benign Flows were flagged by every line in every seed at D = 500, the share no Example fixed.
+
+Test of the `Selector` (`results/selector-test-20261102/`, 5.7 M input tokens, about 0.24 USD). The rows are `splits/selector-test.csv`, 400 Flows of `test.csv` that no split held: 200 benign TCP Flows to port 80 or 443 from Wednesday to Friday, when DoS Examples exist, 100 novel attacks and 100 known ones. Each variant ran one stream with Jev, D = 1, the `KController` at β = 2, the compact record and seed 0, with no failed call. V0 is the `Selector` of D6, V1 drops difficulty, V3 keeps similarity alone and V4 adds the nearest benign Flow to V0's Examples. A memory frozen at the pool would give every Flow difficulty 0.5 and make V0 and V1 send the same requests, so each variant had its own memory and controller, and its Examples and tokens differ for that reason too. McNemar compares each variant with V0, Flow by Flow.
+
+| Variant at 0.5          | False alarms of 200 | Recall | Novel recall | Examples | Tokens per Flow | McNemar on benign Flows |
+| ----------------------- | ------------------- | ------ | ------------ | -------- | --------------- | ----------------------- |
+| V0, D6                  | 28                  | 0.995  | 0.99         | 6.79     | 3,901           |                         |
+| V1, no difficulty       | 12                  | 0.985  | 0.98         | 8.15     | 4,361           | p = 0.00086             |
+| V3, similarity alone    | 11                  | 0.990  | 0.98         | 3.87     | 2,826           | p = 0.00091             |
+| V4, V0 + nearest benign | 8                   | 0.990  | 0.99         | 4.78     | 3,186           | p = 0.000088            |
+
+At 0.64 the false alarms were 4, 1, 3 and 2 and the recall 0.890, 0.915, 0.970 and 0.925. No variant lost an attack V0 caught with a significant McNemar test. Limits: recall sat near its ceiling, D was 1, the benign Flows were web Flows only, one seed ran, and three novel attack names were present (`DoS Slowhttptest`, `Infiltration - Portscan`, `SSH-Patator`). A logistic model fitted on the replays of stage 6 had predicted that V3 and V4 would lose novel recall at D = 500 (0.79 and 0.69), which this test at D = 1 cannot check.
+
+Changed:
+
+- The full system adds the nearest benign Flow in memory to its Examples after MMR, when MMR left it out (`--selection score+nearest`, `Selector(space, anchor)` in `jev_ids/selector.py`). The repository's code rebuilt V4's 400 requests with the same k and number of Examples in every row.
+- The paper split has been read, so the new full system is measured on `splits/paper-v2.csv`, 2,000 Flows drawn with seed 20261102 from the rows of `test.csv` that no other split holds (`draw_split --min-novel 250`, 293 novel attacks), read once.
+- D takes 1, 250 and 500, equal steps up to a quarter of the 2,000-Flow stream. D = 100 of the paper split has no pair on `paper-v2`.
+- The cut is tuned again as D9 fixes it, on the validation stream run with the new `Selector` (`make v2-cut`), and written below before phase 1 runs. The full system and the Jev ablations are read at that cut, the other baselines at 0.5, as in stage 6.
+- Fixed before phase 1 runs, every line reports F1 at its cut, false alarms, recall, novel recall at first contact and after feedback, recall at a false positive rate of 1 % and of 5 %, precision at 1 % prevalence, and input tokens per Flow.
+- Phase 1 (`make -k v2`, 21 runs, about 2.5 USD by `prices.json`) runs the full system at seeds 0 to 2 and the Random Forest, the Isolation Forest and both kNN at seed 0, at every D.
+- Phase 2 (`make -k v2-phase2`, 32 runs, about 9.5 USD) runs the full system without the nearest benign Flow (V0, `--selection score`) and Jev at a fixed k = 1, seeds 0 to 2, then Jev at a random k = 4 and the full system without the `KController`, without the `Selector` and without the compact record, seed 0, at every D, and β = 1.5 and β = 3 at D = 500, seed 0. It runs if the full system beats the Random Forest at D = 500 in F1 or in recall at a false positive rate of 1 %. Whatever runs is reported.
+- The kNN at `matched:4` keeps the K of D10, which counts the `Selector`'s Examples at k = 4 without the nearest benign Flow, so it reads at most one Flow fewer than Jev does at k = 4.
+- The six β runs of slot 13 on the paper split are not run, because they measure the `Selector` this change replaces. The partial run `20261102T001127.417018Z-cicids2017-jev-paper` has no stamp.
+
+Not changed: the score and its weights, MMR and λ, D4, the values of D5, D7, the criterion of D9, the baselines of D10 and Jev's prompt. The runs of stage 6 on the paper split stay as the first reading, reported with this change.
