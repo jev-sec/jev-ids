@@ -42,7 +42,9 @@ from jev_ids.selector import Selector, Space
 from jev_ids.stream import Choose, Memory, random_examples, split_names, stream_cell
 
 RESULTS_DIR = ROOT / "results"
-SELECTIONS = ("random", "score")
+# Naming the selections, the two that run the `Selector` last. `score+nearest` adds the nearest benign Flow (2026-11-02).
+SELECTIONS = ("random", "score", "score+nearest")
+SCORED = SELECTIONS[1:]
 CONTROLS = ("fixed", "aimd")
 # Listing the Detectors that get the whole memory (k = all) instead of chosen Examples.
 WHOLE_MEMORY = ("random_forest", "isolation_forest", "knn")
@@ -71,8 +73,9 @@ class RunSpec:
             None judges every Flow against one fixed draw of Examples, the protocol of the first paper.
         record: how Jev and the LLMs read a Flow's values, `full` or `compact`
             (`dataset.RECORDS`, docs/jevids-design.md, D7). The forests always read them in full.
-        selection: how a stream gives Jev and the LLMs their Examples, `random` (line 0) or `score` (the `Selector`, D6); None means
-            `score` for a stream and `random` otherwise, the only choice the protocol of the first paper has.
+        selection: how a stream gives Jev and the LLMs their Examples, `random` (line 0), `score` (the `Selector`, D6) or
+            `score+nearest` (the `Selector` plus the nearest benign Flow, 2026-11-02). None means `score` for a stream
+            and `random` otherwise, the only choice the protocol of the first paper has.
         neighbours: K of the kNN, a number or `matched:k` (`knn.parse_neighbours`); None for every other Detector.
         control: `fixed`, the same k for every Category and step, or `aimd`, the `KController` (D5), where k is the starting k₀ = 1 and
             the `Selector` gives the Examples, or a random draw under `random` (stage 6's ablation without the `Selector`).
@@ -152,8 +155,8 @@ def check_spec(spec: RunSpec, detector_name: str) -> None:
         raise ValueError("the Random Forest starts at k = 1")
     if detector_name in ("isolation_forest", "knn") and spec.k_values != (None,):
         raise ValueError(f"the {detector_name} runs at k = all only")
-    if spec.selection not in (None, *SELECTIONS) or (spec.delay is None and spec.selection == "score"):
-        raise ValueError(f"selection {spec.selection!r}: `random` or `score`, and `score` needs a stream (--delay)")
+    if spec.selection not in (None, *SELECTIONS) or (spec.delay is None and spec.selection in SCORED):
+        raise ValueError(f"selection {spec.selection!r}: one of {', '.join(SELECTIONS)}, and the `Selector` needs a stream (--delay)")
     if spec.control not in CONTROLS:
         raise ValueError(f"control {spec.control!r}: `fixed` or `aimd`")
     if spec.control == "aimd" and (spec.delay is None or spec.k_values != (1,)):
@@ -311,7 +314,9 @@ def execute_stream(
     run_dir = spec.results_dir / run_fields["run_id"]
     assert spec.delay is not None  # noqa: S101  execute only streams with a delay
     names = split_names(config["dir"] / "splits" / f"{spec.split}.csv")
-    selector = Selector(Space(random_forest.vocabulary(train, config), train)) if run_fields["selection"] == "score" else None
+    selection = run_fields["selection"]
+    anchor = config["benign"] if selection == "score+nearest" else None
+    selector = Selector(Space(random_forest.vocabulary(train, config), train), anchor) if selection in SCORED else None
     for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
         # Giving each cell a fresh memory and a fresh controller, so what one cell learned never leaks into the next.
         memory = Memory(train, config["categories"], spec.delay, names)

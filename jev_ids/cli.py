@@ -80,7 +80,8 @@ def build_parser() -> argparse.ArgumentParser:
     runner.add_argument(
         "--selection",
         choices=run.SELECTIONS,
-        help="Examples of a stream: by score and MMR (score, the default) or at random (random, line 0)",
+        help="Examples of a stream: by score and MMR (score, the default), the same plus the nearest benign Flow (score+nearest)"
+        " or at random (random, line 0)",
     )
     runner.add_argument(
         "--control",

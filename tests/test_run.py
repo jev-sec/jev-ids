@@ -290,8 +290,10 @@ def test_selection_is_score_in_a_stream_random_outside_and_none_for_the_forests(
     assert run.selection_of(replace(stream_spec, delay=None), "jev") == "random"
     assert run.selection_of(stream_spec, "random_forest") is None
     run.check_spec(replace(stream_spec, selection="random"), "jev")
-    with pytest.raises(ValueError, match="needs a stream"):
-        run.check_spec(replace(stream_spec, delay=None, selection="score"), "jev")
+    run.check_spec(replace(stream_spec, selection="score+nearest"), "jev")
+    for selection in run.SCORED:
+        with pytest.raises(ValueError, match="needs a stream"):
+            run.check_spec(replace(stream_spec, delay=None, selection=selection), "jev")
     with pytest.raises(ValueError, match="selection"):
         run.check_spec(replace(stream_spec, selection="best"), "jev")
     assert run.choose_with(None, 4, ["normal"]) is None

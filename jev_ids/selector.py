@@ -82,11 +82,16 @@ def difficulty(row: Prediction | None) -> float:
 
 
 class Selector:
-    """Chooses ceil(k_c) Examples of each Category for one Flow, by score and MMR over the memory visible to it."""
+    """Chooses ceil(k_c) Examples of each Category for one Flow, by score and MMR over the memory visible to it.
 
-    def __init__(self, space: Space) -> None:
-        """Keep the space the distances are measured in."""
+    With an anchor Category, the nearest candidate of that Category joins its Examples when MMR left it out (the change of 2026-11-02 in
+    docs/jevids-design.md, the benign Category as anchor).
+    """
+
+    def __init__(self, space: Space, anchor: str | None = None) -> None:
+        """Keep the space the distances are measured in and the anchor Category, None for the `Selector` of D6 as fixed."""
         self.space = space
+        self.anchor = anchor
 
     def choose(self, memory: Memory, flow: Flow, step: int, k: Mapping[str, float]) -> list[Flow]:
         """The Examples for `flow` at `step`: ceil(k[c]) per Category c, or fewer when the Category has fewer distinct candidates.
@@ -108,17 +113,24 @@ class Selector:
         for category in memory.categories:
             candidates = memory.visible(category, step, end_of(flow))
             if candidates and k.get(category, 0) > 0:
-                chosen += self.pick(memory, target, candidates, math.ceil(k[category]))
+                chosen += self.pick(memory, target, candidates, math.ceil(k[category]), anchored=category == self.anchor)
         random.Random(f"{flow.row_id}:order").shuffle(chosen)  # noqa: S311  seeded, not secret
         return chosen
 
-    def pick(self, memory: Memory, target: np.ndarray, candidates: Sequence[Flow], count: int) -> list[Flow]:
-        """`count` of one Category's candidates: the score of each, then MMR."""
+    def pick(self, memory: Memory, target: np.ndarray, candidates: Sequence[Flow], count: int, *, anchored: bool = False) -> list[Flow]:
+        """`count` of one Category's candidates by score and MMR, then the nearest candidate when `anchored` and MMR left it out.
+
+        The first of several equally near candidates counts as the nearest, in the memory's order.
+        """
         points = self.space.points(candidates)
-        similarity = unit_rank(-np.linalg.norm(points - target, axis=1))
+        distance = np.linalg.norm(points - target, axis=1)
         recency = unit_rank(np.asarray([end_of(candidate).timestamp() for candidate in candidates]))
         hardness = np.asarray([difficulty(memory.rows.get(candidate.row_id)) for candidate in candidates])
-        return [candidates[index] for index in mmr(points, similarity + recency + hardness, count)]
+        picked = [candidates[index] for index in mmr(points, unit_rank(-distance) + recency + hardness, count)]
+        nearest = candidates[int(np.argmin(distance))]
+        if anchored and nearest.row_id not in {example.row_id for example in picked}:
+            picked.append(nearest)
+        return picked
 
 
 def mmr(points: np.ndarray, score: np.ndarray, count: int) -> list[int]:

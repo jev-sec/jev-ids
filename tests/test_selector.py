@@ -95,6 +95,35 @@ def test_choose_gives_ceil_k_per_category_from_the_visible_memory_only() -> None
     assert chooser.choose(memory, flow, 0, k_without_probe) == chosen
 
 
+def test_the_anchor_category_adds_its_nearest_candidate_once() -> None:
+    pool = [
+        # Giving the nearest normal Flow the oldest end, so the score alone prefers the newer row 2.
+        at(make_flow(0, "normal", value="9.2"), 0),
+        at(make_flow(1, "normal", value="1"), 1),
+        at(make_flow(2, "normal", value="6"), 2),
+        at(make_flow(3, "dos", value="9.1"), 3),
+        at(make_flow(4, "dos", value="2"), 4),
+    ]
+    memory = stream.Memory(pool, CONFIG["categories"], 1)
+    space = selector.Space(vocabulary(pool, CONFIG), pool)
+    k_by_category = {
+        "normal": 1,
+        "dos": 1,
+    }
+
+    def normal_and_dos(chooser: selector.Selector, value: str) -> tuple[list[int], int]:
+        """The row_ids of the normal Examples, sorted, and the count of DoS Examples for a Flow with `value`."""
+        chosen = chooser.choose(memory, at(make_flow(100, "normal", value=value), 10), 0, k_by_category)
+        normal = sorted(example.row_id for example in chosen if example.category == "normal")
+        return normal, sum(example.category == "dos" for example in chosen)
+
+    assert normal_and_dos(selector.Selector(space), "9") == ([2], 1)
+    # Adding row 0, the nearest normal Flow, to the anchor Category only.
+    assert normal_and_dos(selector.Selector(space, "normal"), "9") == ([0, 2], 1)
+    # Adding nothing when the nearest normal Flow is already the one the score chose.
+    assert normal_and_dos(selector.Selector(space, "normal"), "6.1") == ([2], 1)
+
+
 def test_a_judged_flow_jev_got_wrong_is_preferred() -> None:
     pool = [at(make_flow(0, "normal", value="4"), 0)]
     memory = stream.Memory(pool, CONFIG["categories"], 1)
