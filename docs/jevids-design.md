@@ -18,7 +18,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                    |
 | Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below           |
 | Stage 6                                 | Slots 1 to 12 done, stopped in slot 13 (β) on 2026-11-02, see below     |
-| Stage 6 on `paper-v2`                   | Phase 1 from 2026-11-02, change of 2026-11-02 below                     |
+| Stage 6 on `paper-v2`                   | Phase 1 read on 2026-11-02, 19 of 21 runs, change of 2026-11-02 below   |
 
 ## Goal
 
@@ -573,3 +573,27 @@ Changed:
 Not changed: the score and its weights, MMR and λ, D4, the values of D5, D7, the criterion of D9, the baselines of D10 and Jev's prompt. The runs of stage 6 on the paper split stay as the first reading, reported with this change.
 
 The cut, written before phase 1 ran. `make v2-cut` ran the new full system over the 300 validation Flows (177 BENIGN, 123 attacks, no novel attack), seeds 0 to 2, at commit `0fa4ee8`, with no failed call (`results/design-cicids2017/20261102T043354.589088Z-cicids2017-jev-validation`). `jev-ids threshold` picked p_attack ≥ 0.58, with mean F1 1.000 against 0.991 at 0.5. At 0.5 the run raised 2, 2 and 3 false alarms per seed and missed no attack, against 17.7 false alarms per seed for the `Selector` of D6 on the same stream. At 0.58 it raised none and missed none. The margin is thin, because the highest benign p_attack was 0.55 and the lowest attack p_attack was 0.58, so 0.58 sits on an attack. The full system and the Jev ablations on `paper-v2` are read at 0.58.
+
+Phase 1, read on 2026-11-02. `make -k v2` ran from 04:39 to 07:01 UTC at commit `90629a2`, with no failed call in the 19 stamped runs (`results/design-cicids2017/v2-done/`). TypeSafe credits ran out (HTTP 402) at row 1,870 of the full system at D = 250, seed 1, so seeds 1 and 2 at D = 250 have no stamp and the partial run `20261102T060811.607409Z-cicids2017-jev-paper-v2` is left out. The stamped Jev runs used 41.3 M input tokens (1.74 USD) and the partial one 5.5 M (0.23 USD). The full system is read at 0.58 and averaged over its seeds, the baselines at 0.5 with seed 0. Precision at 1 % assumes that 1 % of Flows are attacks.
+
+| D   | Line             | Seeds | F1    | False alarms | Recall | Novel, first contact | Novel, after feedback | Recall at FPR 1 % | Recall at FPR 5 % | Precision at 1 % | Tokens per Flow |
+| --- | ---------------- | ----- | ----- | ------------ | ------ | -------------------- | --------------------- | ----------------- | ----------------- | ---------------- | --------------- |
+| 1   | Full system      | 3     | 0.984 | 1.7          | 0.971  | 1.000                | 0.953                 | 0.995             | 0.999             | 0.86             | 2,950           |
+| 1   | Random Forest    | 1     | 0.988 | 1            | 0.978  | 0.333                | 0.952                 | 0.998             | 0.998             | 0.91             | 0               |
+| 1   | Isolation Forest | 1     | 0.495 | 75           | 0.354  | 0.333                | 0.328                 | 0.118             | 0.215             | 0.05             | 0               |
+| 1   | kNN, k = 4       | 1     | 0.983 | 1            | 0.967  | 0.667                | 0.931                 | 0.985             | 0.985             | 0.91             | 0               |
+| 1   | kNN, matched     | 1     | 0.963 | 2            | 0.931  | 0.333                | 0.834                 | 0.988             | 0.988             | 0.83             | 0               |
+| 250 | Full system      | 1     | 0.929 | 3            | 0.870  | 0.577                | none                  | 0.960             | 0.999             | 0.75             | 3,092           |
+| 250 | Random Forest    | 1     | 0.872 | 0            | 0.773  | 0.290                | none                  | 0.897             | 0.921             | 1.00             | 0               |
+| 250 | Isolation Forest | 1     | 0.494 | 75           | 0.353  | 0.328                | none                  | 0.056             | 0.218             | 0.05             | 0               |
+| 250 | kNN, k = 4       | 1     | 0.869 | 1            | 0.769  | 0.287                | none                  | 0.787             | 0.787             | 0.89             | 0               |
+| 250 | kNN, matched     | 1     | 0.873 | 2            | 0.776  | 0.311                | none                  | 0.793             | 0.793             | 0.80             | 0               |
+| 500 | Full system      | 3     | 0.914 | 5            | 0.847  | 0.516                | none                  | 0.931             | 0.999             | 0.64             | 2,909           |
+| 500 | Random Forest    | 1     | 0.873 | 0            | 0.774  | 0.294                | none                  | 0.890             | 0.928             | 1.00             | 0               |
+| 500 | Isolation Forest | 1     | 0.487 | 74           | 0.346  | 0.328                | none                  | 0.047             | 0.213             | 0.05             | 0               |
+| 500 | kNN, k = 4       | 1     | 0.869 | 1            | 0.769  | 0.287                | none                  | 0.787             | 0.787             | 0.89             | 0               |
+| 500 | kNN, matched     | 1     | 0.874 | 2            | 0.778  | 0.311                | none                  | 0.793             | 0.793             | 0.80             | 0               |
+
+At D = 1 first contact covers one Flow per novel attack name, 3 in all. At D = 250 and 500 no Flow of a novel name came back before its last Flow in the stream, so all 293 novel attacks met Jev at first contact and the after-feedback column is empty. McNemar compares each seed of the full system with each baseline, Flow by Flow. At D = 1 the full system ties the Random Forest (p from 0.22 to 0.43) and kNN at k = 4 (p from 0.66 to 1), and it beats the matched kNN (p ≤ 2e-5) and the Isolation Forest. At D = 250 and 500 it beats every baseline in every seed with p ≤ 5e-5, and the Random Forest at D = 500 with p from 2.4e-8 to 1e-5. The rule for phase 2 is met at D = 500, in F1 (0.914 against 0.873) and in recall at a false positive rate of 1 % (0.931 against 0.890).
+
+The full system at D = 500 can be set beside stage 6 on the paper split (the `Selector` of D6) at the same cut of 0.58, but the Flows differ, so the comparison is unpaired. Its false alarms fell from 37 to 45 per seed to 4 to 6, and its novel recall fell too. `DoS Slowhttptest` was caught in 0.53 to 0.58 of its Flows against 0.95 to 0.98 (0.79 to 0.83 against 1.00 at 0.5), and in seeds 0 and 2 Jev named some of those Flows BENIGN. `Infiltration - Portscan` (0.29 to 0.31 against 0.36 to 0.37) and `SSH-Patator` (0.66 to 0.75 against 0.67 to 0.68) moved less. The middle half of each novel name's p_attack lies between 0.47 and 0.69 in every seed, around the cut, and at 0.5 the full system at D = 500 caught 0.943 to 0.948 of the attacks with 10 to 12 false alarms. The hypothesis is that the nearest benign Flow pulls this slow web attack toward BENIGN, and phase 2 tests it with V0 on `paper-v2`, the paired comparison. The cut stays at 0.58, as written before phase 1.
