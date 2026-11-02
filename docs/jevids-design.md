@@ -6,19 +6,19 @@ value changed after a result has been seen is logged in [Changes after results](
 
 ## Status
 
-| Item                                    | State                                                                    |
-| --------------------------------------- | ------------------------------------------------------------------------ |
-| NF-UQ-NIDS-v2 removed                   | Done, commit `1197267`                                                   |
-| Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, replaced in stage 0  |
-| Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0         |
-| Stage 0                                 | Done, commit `3b011d8`                                                   |
-| Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                      |
-| Stage 2                                 | Done, commit `b1d7001`; line 1 below                                     |
-| Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below              |
-| Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                     |
-| Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below            |
-| Stage 6                                 | Slots 1 to 12 done, stopped in slot 13 (β) on 2026-11-02, see below      |
-| Stage 6 on `paper-v2`                   | Phase 1 read, paper battery from 2026-11-02, changes of 2026-11-02 below |
+| Item                                    | State                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| NF-UQ-NIDS-v2 removed                   | Done, commit `1197267`                                                    |
+| Improved CIC-IDS2017 integrated         | Done, commit `48dafa3`; splits cut per attack name, replaced in stage 0   |
+| Pilot runs of Jev, Random Forest and IF | Done, commit `73de8df`; historical, on the splits before stage 0          |
+| Stage 0                                 | Done, commit `3b011d8`                                                    |
+| Stage 1                                 | Done, commits `2e4c763` and `b8a0330`; line 0 below                       |
+| Stage 2                                 | Done, commit `b1d7001`; line 1 below                                      |
+| Stage 3                                 | Done, commits `9419db2`, `2c77f04`, `7654808`; line 2 below               |
+| Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                      |
+| Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below             |
+| Stage 6                                 | Slots 1 to 12 done, stopped in slot 13 (β) on 2026-11-02, see below       |
+| Stage 6 on `paper-v2`                   | Phase 1 and paper battery read on 2026-11-02, changes of 2026-11-02 below |
 
 ## Goal
 
@@ -611,3 +611,65 @@ Changed:
 - The full system at D = 250 keeps seed 0 alone, and seeds 1 and 2 there leave the plan.
 
 Not changed: Jev IDS, its parameters, the cut of 0.58, the metrics fixed before phase 1, the baselines of D10 and the runs of phase 1.
+
+The paper battery, read on 2026-11-02. `make -k v2-paper-jev` and `make -k v2-paper-baselines` ran side by side from 14:30 to 19:32 UTC at commit `af3a7f3`, with no failed call in the 42 runs. The 26 Jev runs used 200.1 M input tokens (8.40 USD). Every line is read at seed 0, the Jev lines at 0.58 and the baselines at 0.5, so the full system at D = 1 is seed 0 of phase 1. Novel recall carries its number of Flows in brackets. McNemar counts the Flows only the full system got right against those only the line got right, at the same D.
+
+| D   | Line                  | F1    | False alarms | Recall | Novel, first contact | Novel, after feedback | Recall at FPR 1 % | Recall at FPR 5 % | Precision at 1 % | Tokens per Flow | McNemar against the full system |
+| --- | --------------------- | ----- | ------------ | ------ | -------------------- | --------------------- | ----------------- | ----------------- | ---------------- | --------------- | ------------------------------- |
+| 1   | Full system           | 0.985 | 2            | 0.972  | 1.000 (3)            | 0.945 (290)           | 0.994             | 0.998             | 0.83             | 3,029           |                                 |
+| 1   | V0, no nearest benign | 0.979 | 27           | 0.985  | 1.000 (3)            | 0.959 (290)           | 0.937             | 0.989             | 0.27             | 3,300           | 33 / 20, p = 0.098              |
+| 1   | Random Forest         | 0.988 | 1            | 0.978  | 0.333 (3)            | 0.952 (290)           | 0.998             | 0.998             | 0.91             | 0               | 16 / 22, p = 0.42               |
+| 1   | kNN, k = 4            | 0.983 | 1            | 0.967  | 0.667 (3)            | 0.931 (290)           | 0.985             | 0.985             | 0.91             | 0               | 25 / 21, p = 0.66               |
+| 1   | kNN, matched          | 0.963 | 2            | 0.931  | 0.333 (3)            | 0.834 (290)           | 0.988             | 0.988             | 0.83             | 0               | 58 / 17, p = 2.2e-06            |
+| 1   | Isolation Forest      | 0.495 | 75           | 0.354  | 0.333 (3)            | 0.328 (290)           | 0.118             | 0.215             | 0.05             | 0               | 687 / 8, p = 1.6e-191           |
+| 25  | Full system           | 0.978 | 2            | 0.958  | 0.450 (40)           | 0.960 (253)           | 0.990             | 0.998             | 0.83             | 3,114           |                                 |
+| 25  | V0, no nearest benign | 0.972 | 29           | 0.973  | 0.775 (40)           | 0.953 (253)           | 0.938             | 0.996             | 0.26             | 3,245           | 38 / 26, p = 0.17               |
+| 25  | Random Forest         | 0.961 | 0            | 0.926  | 0.625 (40)           | 0.826 (253)           | 0.981             | 0.991             | 1.00             | 0               | 61 / 31, p = 0.0023             |
+| 25  | kNN, k = 4            | 0.951 | 1            | 0.907  | 0.600 (40)           | 0.771 (253)           | 0.938             | 0.938             | 0.90             | 0               | 79 / 30, p = 3e-06              |
+| 25  | kNN, matched          | 0.942 | 2            | 0.892  | 0.600 (40)           | 0.715 (253)           | 0.943             | 0.943             | 0.82             | 0               | 94 / 29, p = 3.4e-09            |
+| 25  | Isolation Forest      | 0.494 | 77           | 0.354  | 0.625 (40)           | 0.281 (253)           | 0.030             | 0.214             | 0.05             | 0               | 686 / 19, p = 1e-175            |
+| 50  | Full system           | 0.970 | 5            | 0.947  | 0.653 (75)           | 0.940 (218)           | 0.978             | 0.998             | 0.66             | 2,984           |                                 |
+| 50  | V0, no nearest benign | 0.971 | 29           | 0.972  | 0.880 (75)           | 0.927 (218)           | 0.929             | 0.991             | 0.26             | 3,339           | 42 / 43, p = 1                  |
+| 50  | Random Forest         | 0.947 | 0            | 0.900  | 0.427 (75)           | 0.812 (218)           | 0.971             | 0.977             | 1.00             | 0               | 81 / 40, p = 0.00024            |
+| 50  | kNN, k = 4            | 0.934 | 1            | 0.878  | 0.373 (75)           | 0.743 (218)           | 0.908             | 0.908             | 0.90             | 0               | 103 / 39, p = 7.6e-08           |
+| 50  | kNN, matched          | 0.925 | 2            | 0.862  | 0.320 (75)           | 0.697 (218)           | 0.913             | 0.913             | 0.82             | 0               | 118 / 38, p = 9.7e-11           |
+| 50  | Isolation Forest      | 0.494 | 77           | 0.354  | 0.427 (75)           | 0.294 (218)           | 0.046             | 0.215             | 0.05             | 0               | 676 / 23, p = 5.6e-168          |
+| 100 | Full system           | 0.954 | 4            | 0.915  | 0.596 (193)          | 0.960 (100)           | 0.956             | 1.000             | 0.70             | 3,102           |                                 |
+| 100 | V0, no nearest benign | 0.943 | 28           | 0.918  | 0.596 (193)          | 0.980 (100)           | 0.831             | 0.953             | 0.25             | 3,259           | 53 / 32, p = 0.029              |
+| 100 | Random Forest         | 0.906 | 0            | 0.828  | 0.415 (193)          | 0.580 (100)           | 0.932             | 0.954             | 1.00             | 0               | 120 / 38, p = 4.2e-11           |
+| 100 | kNN, k = 4            | 0.898 | 1            | 0.816  | 0.389 (193)          | 0.550 (100)           | 0.841             | 0.841             | 0.89             | 0               | 138 / 44, p = 1.7e-12           |
+| 100 | kNN, matched          | 0.892 | 2            | 0.806  | 0.373 (193)          | 0.490 (100)           | 0.847             | 0.847             | 0.81             | 0               | 148 / 43, p = 1.1e-14           |
+| 100 | Isolation Forest      | 0.495 | 75           | 0.354  | 0.415 (193)          | 0.160 (100)           | 0.051             | 0.215             | 0.05             | 0               | 655 / 34, p = 3.8e-150          |
+| 200 | Full system           | 0.925 | 3            | 0.862  | 0.543 (293)          | none                  | 0.938             | 0.999             | 0.75             | 3,096           |                                 |
+| 200 | V0, no nearest benign | 0.929 | 22           | 0.887  | 0.621 (293)          | none                  | 0.805             | 0.949             | 0.29             | 3,351           | 51 / 56, p = 0.7                |
+| 200 | Random Forest         | 0.873 | 0            | 0.774  | 0.294 (293)          | none                  | 0.885             | 0.908             | 1.00             | 0               | 126 / 43, p = 1.2e-10           |
+| 200 | kNN, k = 4            | 0.869 | 1            | 0.769  | 0.287 (293)          | none                  | 0.787             | 0.787             | 0.89             | 0               | 143 / 54, p = 1.8e-10           |
+| 200 | kNN, matched          | 0.873 | 2            | 0.776  | 0.311 (293)          | none                  | 0.793             | 0.793             | 0.80             | 0               | 141 / 57, p = 2.1e-09           |
+| 200 | Isolation Forest      | 0.495 | 75           | 0.354  | 0.328 (293)          | none                  | 0.063             | 0.220             | 0.05             | 0               | 615 / 45, p = 6.2e-129          |
+
+| D   | Line          | F1    | False alarms | Recall | Novel, first contact | Novel, after feedback | Recall at FPR 1 % | Recall at FPR 5 % | Precision at 1 % | Tokens per Flow | McNemar against the full system |
+| --- | ------------- | ----- | ------------ | ------ | -------------------- | --------------------- | ----------------- | ----------------- | ---------------- | --------------- | ------------------------------- |
+| 1   | Full system   | 0.985 | 2            | 0.972  | 1.000 (3)            | 0.945 (290)           | 0.994             | 0.998             | 0.83             | 3,029           |                                 |
+| 1   | No `Selector` | 0.925 | 69           | 0.920  | 0.667 (3)            | 0.838 (290)           | 0.603             | 0.891             | 0.12             | 3,510           | 141 / 23, p = 6.8e-22           |
+| 1   | Fixed k = 1   | 0.978 | 3            | 0.960  | 1.000 (3)            | 0.934 (290)           | 0.990             | 0.998             | 0.77             | 2,848           | 15 / 2, p = 0.0023              |
+| 1   | Fixed k = 4   | 0.990 | 6            | 0.987  | 1.000 (3)            | 0.976 (290)           | 0.995             | 0.999             | 0.63             | 6,033           | 11 / 21, p = 0.11               |
+| 1   | Full record   | 0.982 | 2            | 0.966  | 0.667 (3)            | 0.955 (290)           | 0.991             | 0.999             | 0.83             | 3,846           | 18 / 12, p = 0.36               |
+| 1   | Random, k = 4 | 0.957 | 75           | 0.988  | 1.000 (3)            | 0.983 (290)           | 0.726             | 0.940             | 0.12             | 5,410           | 83 / 25, p = 1.9e-08            |
+| 50  | Full system   | 0.970 | 5            | 0.947  | 0.653 (75)           | 0.940 (218)           | 0.978             | 0.998             | 0.66             | 2,984           |                                 |
+| 50  | No `Selector` | 0.935 | 65           | 0.936  | 0.853 (75)           | 0.881 (218)           | 0.620             | 0.907             | 0.13             | 3,490           | 113 / 42, p = 1e-08             |
+| 50  | Fixed k = 1   | 0.962 | 3            | 0.930  | 0.693 (75)           | 0.904 (218)           | 0.983             | 1.000             | 0.76             | 2,841           | 29 / 14, p = 0.032              |
+| 50  | Fixed k = 4   | 0.978 | 6            | 0.962  | 0.733 (75)           | 0.954 (218)           | 0.981             | 0.999             | 0.62             | 6,021           | 29 / 43, p = 0.12               |
+| 50  | Full record   | 0.972 | 3            | 0.948  | 0.680 (75)           | 0.917 (218)           | 0.988             | 0.999             | 0.77             | 3,843           | 20 / 23, p = 0.76               |
+| 50  | Random, k = 4 | 0.955 | 73           | 0.982  | 0.973 (75)           | 0.963 (218)           | 0.760             | 0.934             | 0.12             | 5,388           | 82 / 48, p = 0.0036             |
+| 200 | Full system   | 0.925 | 3            | 0.862  | 0.543 (293)          | none                  | 0.938             | 0.999             | 0.75             | 3,096           |                                 |
+| 200 | No `Selector` | 0.886 | 58           | 0.843  | 0.628 (293)          | none                  | 0.554             | 0.826             | 0.13             | 3,692           | 133 / 59, p = 9.7e-08           |
+| 200 | Fixed k = 1   | 0.916 | 4            | 0.849  | 0.532 (293)          | none                  | 0.955             | 0.999             | 0.69             | 2,816           | 31 / 17, p = 0.059              |
+| 200 | Fixed k = 4   | 0.928 | 8            | 0.872  | 0.587 (293)          | none                  | 0.915             | 0.989             | 0.53             | 5,899           | 51 / 56, p = 0.7                |
+| 200 | Full record   | 0.923 | 3            | 0.860  | 0.546 (293)          | none                  | 0.944             | 0.998             | 0.75             | 4,120           | 37 / 35, p = 0.91               |
+| 200 | Random, k = 4 | 0.927 | 69           | 0.926  | 0.771 (293)          | none                  | 0.690             | 0.885             | 0.12             | 5,322           | 76 / 72, p = 0.81               |
+| 200 | β = 1.5       | 0.925 | 3            | 0.863  | 0.553 (293)          | none                  | 0.949             | 1.000             | 0.75             | 3,087           | 15 / 16, p = 1                  |
+| 200 | β = 3         | 0.930 | 4            | 0.872  | 0.580 (293)          | none                  | 0.947             | 0.998             | 0.69             | 3,103           | 19 / 28, p = 0.24               |
+
+Against the Random Forest the full system ties at D = 1 (p = 0.42) and wins at every longer delay, with p = 0.0023 at D = 25 and p ≤ 2.4e-4 from D = 50, while the gap in F1 grows from 0.017 to 0.052. Both kNN and the Isolation Forest lose at every D ≥ 25. F1 at D = 200 matches D = 250 and 500 of phase 1 for the full system (0.925, 0.929, 0.920) and for the Random Forest (0.873, 0.872, 0.873), as expected once D passes the longest burst. Without the `Selector`, Jev loses at every D with 58 to 69 false alarms (p ≤ 1e-7). At a fixed k = 1 it loses at D = 1 and 50 (p = 0.0023 and 0.032) and ties at D = 200 (p = 0.059). At a fixed k = 4 it ties at every D (p from 0.11 to 0.7) with about twice the tokens per Flow (5,899 to 6,033 against 2,984 to 3,096). The full record ties at every D (p ≥ 0.36) with 3,843 to 4,120 tokens per Flow, so the compact record saves 21 % to 25 %. β = 1.5 and β = 3 tie with β = 2 at D = 200 (p = 1 and 0.24). Random Examples at a fixed k = 4 lose at D = 1 and 50 (p = 1.9e-8 and 0.0036) and tie at D = 200 (p = 0.81), with 69 to 75 false alarms and a recall at a false positive rate of 1 % of 0.69 to 0.76.
+
+V0 sets the nearest benign Flow against the same Flows. It raised 22 to 29 false alarms against 2 to 5, and its recall at a false positive rate of 1 % was 0.805 to 0.938 against 0.938 to 0.994. F1 differed by at most 0.011, McNemar favoured the full system at D = 100 (p = 0.029) and found no difference at the other delays (p ≥ 0.098). V0 caught more novel attacks at first contact at D = 25, 50 and 200 (0.775 against 0.450, 0.880 against 0.653, 0.621 against 0.543) and as many at D = 100 (0.596). The hypothesis written after phase 1 holds in part, because the nearest benign Flow buys most of the drop in false alarms and costs novel recall at first contact. One seed was run, so gaps in F1 below about 0.01 may come from the seed. The sign test of stage 6 and the cost against F1 curve are still to be drawn from these runs, with no new call.
