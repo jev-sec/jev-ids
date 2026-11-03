@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="450" viewBox="0 0 1280 450"
      role="img" aria-labelledby="verdict-title">
-  <title id="verdict-title">One flow, two typed questions, two typed answers: is_attack, a noul question, returns 0.82, above the 0.5 cut, so the verdict is attack; category, a choice question, returns dos with confidence 0.84 and the probabilities dos 0.87, probe 0.10, normal 0.02, r2l 0.01, u2r 0.00.</title>
+  <title id="verdict-title">One flow, two typed questions, two typed answers. is_attack, a noul question, returns 0.80, above the 0.58 cut, so the verdict is attack. category, a choice question, returns DoS with confidence 0.89 and the probabilities DoS 0.91, BENIGN 0.08, Botnet 0.01, DDoS 0.00, PortScan 0.00 and BruteForce 0.00. The flow is the first of the zero-day DoS Slowhttptest burst of CIC-IDS2017, judged with labels 200 flows late.</title>
 
   <defs>
     <style>
@@ -14,21 +14,21 @@
 
   <!-- Title and provenance: which flow, which model, how many tokens -->
   <text class="mono" font-size="26" font-weight="700" x="56" y="60" fill="#E9F2EC">two typed questions, two typed answers</text>
-  <text class="mono" font-size="17" x="56" y="90" fill="#8E9A93">flow 3987 of NSL-KDD · one request to jev-1.13.0 · 1,767 tokens in, 77 out · pilot run of 2026-09-21</text>
+  <text class="mono" font-size="17" x="56" y="90" fill="#8E9A93">flow 711725 of CIC-IDS2017 · zero-day DoS Slowhttptest · D = 200 · 3,151 tokens in, 87 out · 2026-11-02</text>
 
   <!-- Question 1: a noul answer is one probability, shown on a 0 to 1 meter with the 0.5 cut marked -->
   <g id="is-attack">
     <text class="mono" font-size="24" font-weight="700" x="56" y="152" fill="#E9F2EC">is_attack</text>
     <rect x="206" y="130" width="64" height="28" rx="6" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
     <text class="mono" font-size="16" x="238" y="150" text-anchor="middle" fill="#3DFF8A">noul</text>
-    <text class="mono" font-size="18" x="56" y="184" fill="#8E9A93">is the connection an intrusion attempt?</text>
+    <text class="mono" font-size="18" x="56" y="184" fill="#8E9A93">is the flow an intrusion attempt?</text>
     <rect x="56" y="204" width="640" height="16" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
-    <rect x="56" y="204" width="524.8" height="16" fill="#3DFF8A"/>
-    <line x1="376" y1="197" x2="376" y2="227" stroke="#E9F2EC" stroke-width="2"/>
+    <rect x="56" y="204" width="512" height="16" fill="#3DFF8A"/>
+    <line x1="427.2" y1="197" x2="427.2" y2="227" stroke="#E9F2EC" stroke-width="2"/>
     <text class="mono" font-size="15" x="56" y="246" fill="#8E9A93">0</text>
-    <text class="mono" font-size="15" x="376" y="246" text-anchor="middle" fill="#8E9A93">0.5 cut</text>
+    <text class="mono" font-size="15" x="427.2" y="246" text-anchor="middle" fill="#8E9A93">0.58 cut</text>
     <text class="mono" font-size="15" x="696" y="246" text-anchor="end" fill="#8E9A93">1</text>
-    <text class="mono" font-size="24" font-weight="700" x="736" y="220" fill="#E9F2EC">0.82</text>
+    <text class="mono" font-size="24" font-weight="700" x="736" y="220" fill="#E9F2EC">0.80</text>
     <text class="mono" font-size="24" font-weight="700" x="824" y="220" fill="#3DFF8A">attack</text>
   </g>
 
@@ -37,22 +37,21 @@
     <text class="mono" font-size="24" font-weight="700" x="56" y="292" fill="#E9F2EC">category</text>
     <rect x="192" y="270" width="78" height="28" rx="6" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
     <text class="mono" font-size="16" x="231" y="290" text-anchor="middle" fill="#3DFF8A">choice</text>
-    <text class="mono" font-size="18" x="56" y="324" fill="#8E9A93">which of the five categories does it belong to?</text>
+    <text class="mono" font-size="18" x="56" y="324" fill="#8E9A93">which of the six categories does it belong to?</text>
     <rect x="56" y="344" width="640" height="16" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
-    <rect x="56" y="344" width="553.8" height="16" fill="#3DFF8A"/>
-    <rect x="610.8" y="344" width="64" height="16" fill="#1E6B3F"/>
-    <rect x="675.8" y="344" width="12.8" height="16" fill="#1E6B3F"/>
+    <rect x="56" y="344" width="580.4" height="16" fill="#3DFF8A"/>
+    <rect x="637.4" y="344" width="51.2" height="16" fill="#1E6B3F"/>
     <rect x="689.6" y="344" width="6.4" height="16" fill="#1E6B3F"/>
     <text class="mono" font-size="15" y="386">
-      <tspan x="56" fill="#3DFF8A">dos 0.87</tspan>
-      <tspan x="146" fill="#8E9A93">· probe 0.10 · normal 0.02 · r2l 0.01 · u2r 0.00</tspan>
+      <tspan x="56" fill="#3DFF8A">DoS 0.91</tspan>
+      <tspan x="146" fill="#8E9A93">· BENIGN 0.08 · Botnet 0.01 · DDoS 0.00 · PortScan 0.00 · BruteForce 0.00</tspan>
     </text>
-    <text class="mono" font-size="24" font-weight="700" x="736" y="360" fill="#3DFF8A">dos</text>
-    <text class="mono" font-size="20" x="824" y="360" fill="#E9F2EC">confidence 0.84</text>
+    <text class="mono" font-size="24" font-weight="700" x="736" y="360" fill="#3DFF8A">DoS</text>
+    <text class="mono" font-size="20" x="824" y="360" fill="#E9F2EC">confidence 0.89</text>
   </g>
 
   <!-- Footer: the one sentence the figure exists to make -->
-  <text class="mono" font-size="16" x="56" y="428" fill="#8E9A93">a probability, an option and a confidence come back. no text to parse. attack when p_attack >= 0.5</text>
+  <text class="mono" font-size="16" x="56" y="428" fill="#8E9A93">a probability, an option and a confidence come back. no text to parse. attack when p_attack >= 0.58</text>
 
   <rect x="0.5" y="0.5" width="1279" height="449" fill="none" stroke="#1E6B3F" stroke-width="1"/>
 </svg>

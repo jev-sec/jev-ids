@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="480" viewBox="0 0 1280 480"
      role="img" aria-labelledby="request-title">
-  <title id="request-title">How Jev IDS works: the flow under test and k labeled examples per category go into one request to jev-1.13.0, whose state holds instructions, columns, categories, examples and flows.under_test, with two questions, is_attack as noul and category as choice; the answers come back typed, p_attack 0.82 giving the verdict attack at the 0.5 cut, and category dos with confidence 0.84.</title>
+  <title id="request-title">How Jev IDS builds one request. The flow under test and the examples the Selector chose, ceil(k) per category, go into one request to jev-1.13.0, whose state holds instructions, columns, categories, examples and flows.under_test, with two questions, is_attack as noul and category as choice. The answers come back typed, p_attack 0.80 giving the verdict attack at the 0.58 cut, and category DoS with confidence 0.89.</title>
 
   <defs>
     <style>
@@ -14,7 +14,7 @@
 
   <!-- Title and the one fact about provenance: the request is a file -->
   <text class="mono" font-size="26" font-weight="700" x="56" y="60" fill="#E9F2EC">one flow. one request. one verdict.</text>
-  <text class="mono" font-size="17" x="56" y="90" fill="#8E9A93">the whole request is prompts/nsl-kdd/jev.json · python adds only the flow and the examples</text>
+  <text class="mono" font-size="17" x="56" y="90" fill="#8E9A93">the whole request is prompts/cicids2017/jev.json · python adds only the flow and the examples</text>
 
   <!-- Column labels -->
   <text class="mono" font-size="16" x="56" y="126" fill="#8E9A93">input</text>
@@ -25,10 +25,10 @@
   <g id="input">
     <rect x="56" y="195" width="352" height="80" rx="10" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
     <text class="mono" font-size="22" font-weight="700" x="80" y="230" fill="#E9F2EC">flow under test</text>
-    <text class="mono" font-size="16" x="80" y="258" fill="#8E9A93">one record, 41 columns</text>
+    <text class="mono" font-size="16" x="80" y="258" fill="#8E9A93">one record, 83 columns, compact</text>
     <rect x="56" y="299" width="352" height="80" rx="10" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
-    <text class="mono" font-size="22" font-weight="700" x="80" y="334" fill="#E9F2EC">labeled examples</text>
-    <text class="mono" font-size="16" x="80" y="362" fill="#8E9A93">k per category · five at k = 1</text>
+    <text class="mono" font-size="22" font-weight="700" x="80" y="334" fill="#E9F2EC">chosen examples</text>
+    <text class="mono" font-size="16" x="80" y="362" fill="#8E9A93">Selector · ceil(k) per category</text>
   </g>
 
   <!-- The request: a state and two typed questions about it -->
@@ -56,13 +56,13 @@
   <g id="answers">
     <rect x="872" y="195" width="352" height="80" rx="10" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
     <text class="mono" font-size="20" x="896" y="230" fill="#8E9A93">p_attack</text>
-    <text class="mono" font-size="22" font-weight="700" x="1008" y="230" fill="#E9F2EC">0.82</text>
+    <text class="mono" font-size="22" font-weight="700" x="1008" y="230" fill="#E9F2EC">0.80</text>
     <text class="mono" font-size="22" font-weight="700" x="1080" y="230" fill="#3DFF8A">attack</text>
-    <text class="mono" font-size="16" x="896" y="258" fill="#8E9A93">attack when p_attack >= 0.5</text>
+    <text class="mono" font-size="16" x="896" y="258" fill="#8E9A93">attack when p_attack >= 0.58</text>
     <rect x="872" y="299" width="352" height="80" rx="10" fill="#121917" stroke="#1E6B3F" stroke-width="1"/>
     <text class="mono" font-size="20" x="896" y="334" fill="#8E9A93">category</text>
-    <text class="mono" font-size="22" font-weight="700" x="1008" y="334" fill="#3DFF8A">dos</text>
-    <text class="mono" font-size="16" x="896" y="362" fill="#8E9A93">confidence 0.84</text>
+    <text class="mono" font-size="22" font-weight="700" x="1008" y="334" fill="#3DFF8A">DoS</text>
+    <text class="mono" font-size="16" x="896" y="362" fill="#8E9A93">confidence 0.89</text>
   </g>
 
   <line x1="408" y1="235" x2="462" y2="235" stroke="#1E6B3F" stroke-width="2"/><polygon points="462,229 472,235 462,241" fill="#3DFF8A"/>
@@ -71,7 +71,7 @@
   <line x1="808" y1="339" x2="862" y2="339" stroke="#1E6B3F" stroke-width="2"/><polygon points="862,333 872,339 862,345" fill="#3DFF8A"/>
 
   <!-- Footer: the baselines get exactly the same input and the same cut -->
-  <text class="mono" font-size="16" x="56" y="462" fill="#8E9A93">the same flows, the same examples and the same 0.5 cut go to the LLM and the Random Forest</text>
+  <text class="mono" font-size="16" x="56" y="462" fill="#8E9A93">the same stream and the same memory go to the Random Forest, the kNN and the Isolation Forest, cut at 0.5</text>
 
   <rect x="0.5" y="0.5" width="1279" height="479" fill="none" stroke="#1E6B3F" stroke-width="1"/>
 </svg>

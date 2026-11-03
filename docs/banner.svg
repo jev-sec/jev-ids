@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320"
      role="img" aria-labelledby="banner-title">
-  <title id="banner-title">Jev IDS: intrusion detection with a System One Model, benchmarked against an LLM and a Random Forest.</title>
+  <title id="banner-title">Jev IDS: intrusion detection with a System One Model, on a stream of flows whose labels come back late.</title>
 
   <defs>
     <style>
@@ -44,13 +44,13 @@
   <!-- Tagline in the text face, broken in two lines because one line would run under the panel -->
   <text id="tagline" class="text" font-size="20" fill="#E9F2EC">
     <tspan x="56" y="170">Intrusion detection with a System One Model,</tspan>
-    <tspan x="56" y="198">benchmarked against an LLM and a Random Forest.</tspan>
+    <tspan x="56" y="198">on a stream of flows whose labels come back late.</tspan>
   </text>
 
   <!-- One real command as the signature: a dim prompt, then the command itself in phosphor -->
   <text id="command" class="mono" font-size="15" y="256">
     <tspan x="56" fill="#1E6B3F">$</tspan>
-    <tspan x="74" fill="#3DFF8A">uv run jev-ids run --dataset data/nsl-kdd/dataset.json --detector jev --k 0,1,2,4</tspan>
+    <tspan x="74" fill="#3DFF8A">uv run jev-ids run --dataset data/cicids2017/dataset.json --detector jev --delay 200</tspan>
   </text>
 
   <!-- Thin border last, so it also separates the banner from the page behind it -->

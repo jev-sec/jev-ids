@@ -1,4 +1,6 @@
-# Paper protocol
+# NSL-KDD paper protocol
+
+This protocol covers the k-shot benchmark on NSL-KDD. The CIC-IDS2017 Stream is fixed in [jevids-design.md](jevids-design.md) and run by the `v2` targets of the `Makefile`, as the README's [Reproduce the paper](../README.md#reproduce-the-paper) shows.
 
 How the reported numbers of Jev IDS are produced, so that anyone with the repository, the raw NSL-KDD files and the API keys can produce
 them again. Everything a run depends on is either committed here or written into the run's `config.json`.

@@ -1,4 +1,6 @@
-# Results
+# Results on NSL-KDD
+
+These are the k-shot results of the first benchmark. The CIC-IDS2017 Stream results are in the [README](../README.md#evidence-and-limits), and their reading next to each run is in [jevids-design.md](jevids-design.md).
 
 Paper split of NSL-KDD (2,000 flows, 300 of them zero-day attacks), 3 seeds, k in {0, 1, 2, 4, 8}; runs of 2026-09-22 in `results/paper/`.
 Jev is `jev-1.13.0` through the TypeSafe SDK; Gemini is `gemini-3.6-flash` on Vertex AI through Agno. Prices are the list prices in
