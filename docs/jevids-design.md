@@ -18,7 +18,7 @@ value changed after a result has been seen is logged in [Changes after results](
 | Stage 4                                 | Done, commit `a4a4e04`; line 3 below                                      |
 | Stage 5                                 | Done, commits `805d7e4` and `fc0c8c6`, cut 0.64, line 4 below             |
 | Stage 6                                 | Slots 1 to 12 done, stopped in slot 13 (β) on 2026-11-02, see below       |
-| Stage 6 on `paper-v2`                   | Phase 1 and paper battery read on 2026-11-02, changes of 2026-11-02 below |
+| Stage 6 on `paper-v2`                   | Phase 1, paper battery and seed repetitions read on 2026-11-02, see below |
 
 ## Goal
 
@@ -684,4 +684,17 @@ The sign test of stage 6 compares the full system with each line at each D, on a
 - With random Examples at k = 4, Jev loses on all Flows at D = 1 and 50 (Holm p = 5.6e-8 and 0.0073) and catches more novel attacks at D = 50 and 200 (36 Flows against 7 and 72 against 5, family p = 0.00073 and 3.1e-14), at the price of 69 to 75 false alarms.
 - V0 differs from the full system in no row over the whole family. With Holm per pair, it catches more known attacks at D = 50 (13 Flows against 2, p = 0.022) and more novel attacks at D = 200 (54 against 31, p = 0.05).
 
-Cost against F1, seed 0, from the tables above. At every D the full system spends 5 % to 10 % more input tokens than Jev at a fixed k = 1 and gains 0.007 to 0.009 in F1. Jev at a fixed k = 4 doubles the tokens (5,899 to 6,033 per Flow) for an F1 at most 0.008 higher, with no subset differing in the sign test. The full record adds 21 % to 25 % of tokens for no difference. Random Examples at k = 4 cost 1.7 to 1.8 times the tokens of the full system and score a lower F1 at D = 1 and 50. The full system therefore sits at the knee of the curve.
+Cost against F1, seed 0, from the tables above. At every D the full system spends 5 % to 10 % more input tokens than Jev at a fixed k = 1 and gains 0.007 to 0.008 in F1. Jev at a fixed k = 4 doubles the tokens (5,899 to 6,033 per Flow) for an F1 at most 0.008 higher, with no subset differing in the sign test. The full record adds 21 % to 25 % of tokens for no difference. Random Examples at k = 4 cost 1.7 to 1.8 times the tokens of the full system and score a lower F1 at D = 1 and 50. The full system therefore sits at the knee of the curve.
+
+The repetitions, read on 2026-11-02. `make -k results/design-cicids2017/v2-done/full-d{25,50,100,200}-s{1,2}` ran seeds 1 and 2 of the full system at D = 25, 50, 100 and 200 from 22:53 UTC on 2026-11-02 to 00:25 UTC on 2026-11-03, with no failed call in the 8 runs. They used 49.2 M input tokens (2.07 USD). Their `config.json` names commit `58d09ce` with the suffix `-dirty`, because this file held an uncommitted edit while they ran, and no code file differed from that commit. The rows at D = 1 and 500 are the three seeds of phase 1. Each seed is read at 0.58 and the Random Forest at 0.5. The sign test is the one above, with Holm over the three subsets of each pair, run for each seed against the one run of the Random Forest.
+
+| D   | F1, seeds 0 / 1 / 2   | F1, mean ± SD | False alarms | Novel recall (293)    | Random Forest F1 | All Flows, Holm p per seed | Novel attacks, Holm p per seed |
+| --- | --------------------- | ------------- | ------------ | --------------------- | ---------------- | -------------------------- | ------------------------------ |
+| 1   | 0.985 / 0.985 / 0.983 | 0.984 ± 0.001 | 2 / 1 / 2    | 0.945 / 0.966 / 0.949 | 0.988            | 0.91 / 0.53 / 0.44         | 1 / 0.53 / 1                   |
+| 25  | 0.978 / 0.975 / 0.973 | 0.975 ± 0.002 | 2 / 2 / 2    | 0.891 / 0.887 / 0.870 | 0.961            | 0.0055 / 0.027 / 0.056     | 0.0055 / 0.0066 / 0.042        |
+| 50  | 0.970 / 0.968 / 0.970 | 0.969 ± 0.001 | 5 / 6 / 3    | 0.867 / 0.863 / 0.853 | 0.947            | 4.9e-4 / 0.0014 / 4.3e-4   | 5.7e-6 / 4.8e-6 / 6.1e-5       |
+| 100 | 0.954 / 0.950 / 0.957 | 0.954 ± 0.004 | 4 / 4 / 2    | 0.720 / 0.706 / 0.737 | 0.906            | 1.3e-10 / 1.1e-8 / 4.8e-12 | 8.0e-10 / 1.1e-8 / 6.5e-11     |
+| 200 | 0.925 / 0.922 / 0.923 | 0.923 ± 0.001 | 3 / 3 / 3    | 0.543 / 0.536 / 0.543 | 0.873            | 3.6e-10 / 1.4e-8 / 1.5e-9  | 4.5e-9 / 6.3e-8 / 3.5e-9       |
+| 500 | 0.920 / 0.911 / 0.912 | 0.914 ± 0.005 | 4 / 6 / 5    | 0.549 / 0.505 / 0.495 | 0.873            | 4.8e-8 / 2.1e-5 / 6.0e-6   | 5.2e-9 / 1.9e-6 / 4.5e-6       |
+
+Across seeds 0 to 2 the F1 of the full system has a standard deviation of 0.005 at most and spans 0.009 at most (D = 500). Seed 0 lies within 0.003 of the mean from D = 1 to 200 and 0.006 above it at D = 500. From D = 25 every seed scores a higher F1 than the Random Forest, and the mean gap grows from 0.014 at D = 25 to 0.050 at D = 200. Every seed wins on novel attacks from D = 25 (Holm p ≤ 0.042), on all Flows from D = 50 (Holm p ≤ 0.0014) and on known attacks at D = 100 and 200 (Holm p ≤ 0.031). At D = 25 the win on all Flows holds in seeds 0 and 1 (Holm p = 0.0055 and 0.027) and misses in seed 2 (Holm p = 0.056). At D = 1 the Random Forest scores 0.003 to 0.005 higher in every seed with no difference on all Flows (Holm p ≥ 0.44), and in seed 1 it wins on known attacks (16 Flows against 4, Holm p = 0.035). The other Jev lines keep seed 0 alone, so a gap between two of them smaller than the spread of the full system at their D may come from the seed.
