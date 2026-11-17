@@ -29,8 +29,9 @@ def test_fuse_averages_the_validation_percentiles(tmp_path: Path) -> None:
     # Placing Jev's tied 0.9 at (2 + 4) / 2 of 4 and the kNN's 0.5 at (2 + 4) / 2 of 5, and keeping both originals beside the fused value.
     assert (rows[3]["p_attack"], rows[3]["p_attack_jev"], rows[3]["p_attack_knn"]) == (pytest.approx(0.675), 0.9, 0.5)
     assert (rows[3]["detector"], rows[3]["model"], rows[3]["classification_verdict"]) == ("fusion", "m+knn-matched-4", 1)
-    # Keeping the failed Jev call as an error row with no p_attack.
-    assert (rows[5]["p_attack"], rows[5]["error"]) == (None, "x")
+    # Falling back on the kNN's 0.5 alone, at (2 + 4) / 2 of 5, when Jev's call failed, with Jev's error kept apart.
+    assert (rows[5]["p_attack"], rows[5]["fallback"], rows[5]["error"], rows[5]["error_jev"]) == (pytest.approx(0.6), True, None, "x")
+    assert (rows[3]["fallback"], rows[3]["error_jev"]) == (False, None)
     stored = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
     assert stored["sources"] == {"jev": ["jev"], "knn": "knn", "calibration_jev": ["jev"], "calibration_knn": "knn"}
 

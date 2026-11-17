@@ -12,7 +12,8 @@ its Cut is taken on the fused validation stream by `metrics.best_threshold`, as 
 Jev and the kNN never read each other's answers. The `Selector` and the `KController` read Jev's own rows, and the kNN reads only the
 Categories of the memory, which come back whatever any Detector said. So one Stream judged twice, once by each Detector, joined by
 `row_id`, gives every row a run of both together would give, and the Fusion is built from the two finished runs at no cost.
-A Flow Jev failed on keeps its error and no p_attack, because what the Fusion does without Jev's answer is still open.
+When Jev's call fails, the Fusion falls back on the matched kNN, whose percentile alone is the p_attack. The row keeps Jev's error
+as `error_jev` and says `fallback`, so a reader can count these Flows or leave them out.
 """
 
 from bisect import bisect_left, bisect_right
@@ -75,17 +76,25 @@ def fuse(jev_dirs: Sequence[Path], knn_dir: Path, calibration: tuple[Sequence[Pa
     write_config(run_dir, {"run_id": run_id, "detector": "fusion", "sources": sources, "started_at": started.isoformat(timespec="seconds")})
 
     # Copying each Jev row, with the fused p_attack in place of Jev's and both originals kept beside it.
+    # A failed Jev call has no p_attack, so the kNN's percentile stands alone and the failure moves to `error_jev`.
     for row in jev_rows:
-        fused: Prediction = {**row, "run_id": run_id, "detector": "fusion", "model": f"{row['model']}+{knn_rows[row['row_id']]['model']}"}
-        if row.get("error") is None:
-            jev, knn = row.get("p_attack") or 0, knn_rows[row["row_id"]].get("p_attack") or 0
-            score = mean([jev_percentile(jev), knn_percentile(knn)])
-            fused |= {
-                "p_attack": score,
-                "p_attack_jev": jev,
-                "p_attack_knn": knn,
-                "classification_verdict": int(score >= VERDICT_THRESHOLD),
-            }
+        knn = knn_rows[row["row_id"]].get("p_attack") or 0
+        failed = row.get("error") is not None
+        jev = None if failed else row.get("p_attack") or 0
+        score = knn_percentile(knn) if jev is None else mean([jev_percentile(jev), knn_percentile(knn)])
+        fused: Prediction = {
+            **row,
+            "run_id": run_id,
+            "detector": "fusion",
+            "model": f"{row['model']}+{knn_rows[row['row_id']]['model']}",
+            "p_attack": score,
+            "p_attack_jev": jev,
+            "p_attack_knn": knn,
+            "classification_verdict": int(score >= VERDICT_THRESHOLD),
+            "fallback": failed,
+            "error": None,
+            "error_jev": row.get("error"),
+        }
         append_prediction(run_dir, fused)
     print(f"done: {run_dir}")
     return run_dir
