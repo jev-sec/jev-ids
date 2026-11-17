@@ -1,11 +1,11 @@
-"""The command line: `jev-ids run|redo-errors|metrics|compare|sign-test|threshold`, also reachable as `python -m jev_ids`.
+"""The command line: `jev-ids run|redo-errors|metrics|compare|sign-test|threshold|fuse`, also reachable as `python -m jev_ids`.
 
 In reading order:
 
 - `parse_k` and `parse_list`: the list arguments (`--k 0,1,all`).
-- `build_parser`: the six subcommands and their arguments.
-- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`, `threshold_command`:
-  one handler per subcommand, each turning the parsed arguments into calls of `run` or `metrics`.
+- `build_parser`: the seven subcommands and their arguments.
+- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`, `threshold_command`, `fuse_command`:
+  one handler per subcommand, each turning the parsed arguments into calls of `run`, `metrics` or `fusion`.
 - `read_runs`: the rows of the run directories given, cut again at a threshold when one is given.
 - `print_csv`: a table as CSV on stdout.
 - `main`: parse, dispatch, return the exit code.
@@ -22,7 +22,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from jev_ids import ROOT, metrics, run
+from jev_ids import ROOT, fusion, metrics, run
 from jev_ids.controller import BETA
 from jev_ids.dataset import RECORDS
 from jev_ids.records import Prediction, read_predictions
@@ -49,7 +49,7 @@ def parse_list(text: str) -> tuple[int | None, ...]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """The six subcommands, each carrying the function that handles it."""
+    """The seven subcommands, each carrying the function that handles it."""
     parser = argparse.ArgumentParser(prog="jev-ids")
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -133,6 +133,14 @@ def build_parser() -> argparse.ArgumentParser:
     tuner = commands.add_parser("threshold", help="the cut on p_attack with the best mean F1 over the validation runs given (D9)")
     tuner.add_argument("run_dirs", nargs="+", type=Path, help="results/<run_id> directories of the validation stream")
     tuner.set_defaults(handler=threshold_command)
+
+    fuser = commands.add_parser("fuse", help="the Fusion run of a Stream, from its Jev runs and its matched kNN run")
+    fuser.add_argument("jev_dirs", nargs="+", type=Path, help="results/<run_id> directories of Jev on the Stream")
+    fuser.add_argument("--knn", required=True, type=Path, help="results/<run_id> directory of the matched kNN on the same Stream")
+    fuser.add_argument("--calibration-jev", nargs="+", required=True, type=Path, help="Jev's runs of the validation stream")
+    fuser.add_argument("--calibration-knn", required=True, type=Path, help="the matched kNN's run of the validation stream")
+    fuser.add_argument("--results-dir", required=True, type=Path, help="where the Fusion run directory is created")
+    fuser.set_defaults(handler=fuse_command)
     return parser
 
 
@@ -199,6 +207,11 @@ def sign_test_command(args: argparse.Namespace) -> None:
 def threshold_command(args: argparse.Namespace) -> None:
     """`threshold`: the cut of D9 over the validation runs given, as one CSV row."""
     print_csv([metrics.best_threshold(read_runs(args.run_dirs))])
+
+
+def fuse_command(args: argparse.Namespace) -> None:
+    """`fuse`: the Fusion run of a Stream, its percentiles read on the validation runs given."""
+    fusion.fuse(args.jev_dirs, args.knn, (args.calibration_jev, args.calibration_knn), args.results_dir)
 
 
 def read_runs(run_dirs: Sequence[Path], threshold: float | None = None) -> list[Prediction]:
