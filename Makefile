@@ -124,17 +124,15 @@ mutation:
 	@[ ! -f package.json ] || npx stryker run
 
 
-# The zero-day battery of docs/jevids-design.md. DATASET picks CIC-IDS2017 (split `paper-v3`) or TRUSTLab (split `paper`), as in
+# The zero-day battery of docs/jevids-design.md, on the split `paper`. DATASET picks CIC-IDS2017 or TRUSTLab, as in
 # `make -k zeroday-jev DATASET=trustlab`. A run that ends with no error row leaves a stamp in results/zeroday-<dataset>/v2-done/ holding
 # the name of its directory, and make skips every run whose stamp exists, so the same command resumes a chain that was cut. Each stamp
 # names the directory its own run printed, so `make -j` may run several runs at the same time. caffeinate keeps the Mac awake meanwhile.
 DATASET ?= cicids2017
-SPLIT_cicids2017 = paper-v3
-SPLIT_trustlab = paper
 RESULTS = results/zeroday-$(DATASET)
 DONE = $(RESULTS)/v2-done
 KEEP_AWAKE = $(if $(shell command -v caffeinate),caffeinate -i)
-RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/$(DATASET)/dataset.json --split $(SPLIT_$(DATASET)) --results-dir $(RESULTS) --delay
+RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/$(DATASET)/dataset.json --split paper --results-dir $(RESULTS) --delay
 # The Examples of Jev alone: the `Selector`'s choice plus the nearest benign Flow.
 ANCHOR = --selection score+nearest
 # Reading D and the seed from the stem of a stamp, `200-s2` for `full-d200-s2`.

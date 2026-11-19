@@ -339,27 +339,3 @@ def test_usage_reads_median_and_p95_latency_of_successful_calls_only() -> None:
     assert summary["latency_ms_p95"] == pytest.approx(statistics.quantiles(range(1, 21), n=20)[-1])
     # Giving a single successful call a median but no 95th percentile.
     assert metrics.usage(rows[:1], PRICES)["latency_ms_p95"] is None
-
-
-def test_holm_multiplies_by_rank_keeps_order_and_caps_at_one() -> None:
-    assert metrics.holm([0.01, 0.04, 0.03]) == pytest.approx([0.03, 0.06, 0.06])
-    assert metrics.holm([0.5, 0.9]) == [1.0, 1.0]
-    assert metrics.holm([]) == []
-
-
-def test_sign_test_counts_flows_by_seeds_right_and_drops_ties() -> None:
-    # Making three Flows. Flow 1: A right in both seeds, B in one.
-    # Flow 2: both right in both seeds (a tie). Flow 3: B right in both, A in none.
-    run_a = [make(1, 1, 1.0, seed=0), make(1, 1, 1.0, seed=1), make(2, 0, 0.0, seed=0), make(2, 0, 0.0, seed=1)]
-    run_a += [make(3, 1, 0.0, seed=0), make(3, 1, 0.0, seed=1)]
-    run_b = [make(1, 1, 1.0, seed=0), make(1, 1, 0.0, seed=1), make(2, 0, 0.0, seed=0), make(2, 0, 0.0, seed=1)]
-    run_b += [make(3, 1, 1.0, seed=0), make(3, 1, 1.0, seed=1), make(4, 1, 1.0, k=8)]
-    assert metrics.sign_test(run_a, run_b) == [
-        {
-            "k": 1,
-            "flows": 3,
-            "a_better": 1,
-            "b_better": 1,
-            "sign_p": 1.0,
-        }
-    ]

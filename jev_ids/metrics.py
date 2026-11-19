@@ -1,9 +1,9 @@
-"""Tables from predictions.jsonl rows: `summarize` one or more runs, `compare` or `sign_test` two, `best_threshold` on validation.
+"""Tables from predictions.jsonl rows: `summarize` one or more runs, `compare` two, `best_threshold` on validation.
 
 Helpers first (`verdict`, `at_threshold`, `mean`, `ratio`, `rate`, `only_subset`, `only_k`, `group_by_fields`),
 then the scores of one set of rows (`recall_by_category`, `ranking`, `scores`), the priced usage (`cost_usd_per_1m`,
 `latency`, `usage`), the summary (`summary`, `none_last_key`, `summarize`), the cut of D9 (`best_threshold`)
-and the paired comparisons (`mcnemar_exact`, `holm`, `sign_test`, `compare_cell`, `compare`). F1 is the attack class's,
+and the paired comparisons (`mcnemar_exact`, `compare_cell`, `compare`). F1 is the attack class's,
 not macro. A row without a Verdict counts as `normal` (fail-open) and ranks lowest, and the CLI turns the dicts into CSV.
 """
 
@@ -307,66 +307,6 @@ def mcnemar_exact(a_correct: int, b_correct: int) -> float:
     total = a_correct + b_correct
     tail = sum(comb(total, i) for i in range(min(a_correct, b_correct) + 1)) / 2**total
     return min(1.0, 2 * tail)
-
-
-def holm(p_values: Sequence[float]) -> list[float]:
-    """Holm's step-down adjustment of a family of p-values, returned in the input order.
-
-    The i-th smallest p of m is multiplied by `m - i + 1` and capped at 1, and the running maximum keeps the adjusted values monotone.
-
-    Args:
-        p_values: the family of p-values, in any order.
-
-    Returns:
-        The adjusted p-values, each at the position of its raw one.
-    """
-    adjusted = [0.0] * len(p_values)
-    running_maximum = 0.0
-    for rank, index in enumerate(sorted(range(len(p_values)), key=lambda index: p_values[index])):
-        running_maximum = max(running_maximum, min(1.0, (len(p_values) - rank) * p_values[index]))
-        adjusted[index] = running_maximum
-    return adjusted
-
-
-def sign_test(run_a: Sequence[Prediction], run_b: Sequence[Prediction]) -> list[dict[str, Any]]:
-    """Flow-level exact sign test of run A against run B, one table row per k both runs share.
-
-    The seeds of a Flow are not independent observations, so the Flow is the unit. For each Flow judged by both
-    runs at that k, the seeds in which A is right are counted against the seeds in which B is right. A Flow with
-    more seeds right in A favors A, the reverse favors B, and a tie is left out. The exact two-sided binomial
-    test on the two counts is the same test `mcnemar_exact` runs on discordant pairs, here applied to Flows.
-
-    Args:
-        run_a: the rows of run A.
-        run_b: the rows of run B.
-
-    Returns:
-        One dict per shared k, k = all last, with the Flows both runs judged, `a_better`, `b_better` and the exact `sign_p`.
-    """
-    table: list[dict[str, Any]] = []
-    for k in sorted(
-        {prediction["k"] for prediction in run_a} & {prediction["k"] for prediction in run_b}, key=lambda k: none_last_key([k])
-    ):
-        # Counting, for each Flow, the seeds in which each run gave the right Verdict.
-        right_a: dict[int, int] = defaultdict(int)
-        right_b: dict[int, int] = defaultdict(int)
-        for prediction in only_k(run_a, k):
-            right_a[prediction["row_id"]] += verdict(prediction) == prediction["is_attack"]
-        for prediction in only_k(run_b, k):
-            right_b[prediction["row_id"]] += verdict(prediction) == prediction["is_attack"]
-        flows = right_a.keys() & right_b.keys()
-        a_better = sum(right_a[flow] > right_b[flow] for flow in flows)
-        b_better = sum(right_a[flow] < right_b[flow] for flow in flows)
-        table.append(
-            {
-                "k": k,
-                "flows": len(flows),
-                "a_better": a_better,
-                "b_better": b_better,
-                "sign_p": mcnemar_exact(a_better, b_better),
-            }
-        )
-    return table
 
 
 def compare_cell(pairs: Sequence[PredictionPair]) -> dict[str, Any]:

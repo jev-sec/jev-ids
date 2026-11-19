@@ -132,21 +132,6 @@ def make_prediction(row_id: int, is_attack: int, p_attack: float | None, **overr
     return prediction
 
 
-class FakeResponse:
-    """What `requests.post` returns, reduced to the attributes the code reads."""
-
-    def __init__(self, status_code: int, body: dict[str, Any]) -> None:
-        """Keep the status and the body; `ok` follows the 4xx boundary."""
-        self.status_code = status_code
-        self.ok = status_code < 400
-        self.text = json.dumps(body)
-        self._body = body
-
-    def json(self) -> dict[str, Any]:
-        """The parsed body."""
-        return self._body
-
-
 def no_sleep(_seconds: float) -> None:
     """A backoff that does not wait, for the retry tests."""
     return None

@@ -8,7 +8,6 @@ requires-python = ">=3.13"
 dependencies = [
     "agno[anthropic]>=3.0.10",
     "python-dotenv>=1.2.3",
-    "requests>=2.34.2",
     "scikit-learn>=1.9.1",
     "typesafe-sdk>=0.7.1",
 ]
@@ -28,13 +27,11 @@ packages = ["jev_ids"]
 dev = [
     "httpx2>=2.13.0",
     "import-linter>=2.16",
-    "kaggle>=2.2.4",
     "mutmut>=3.8.1",
     "pylint>=4.1.3",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
-    "types-requests>=2.33.0.20260906",
     "vulture>=2.16",
 ]
 

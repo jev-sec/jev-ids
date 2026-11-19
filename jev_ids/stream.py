@@ -199,4 +199,4 @@ def stream_cell(  # noqa: PLR0913, PLR0917  the cell's fields plus the hook that
         append_prediction(run_dir, prediction)
         memory.add(flow, prediction)
         errors += int(prediction.get("error") is not None)
-    print(f"k={cell['k']} seed={cell['seed']} rep={cell['repetition']} delay={memory.delay} flows={len(flows)} errors={errors}")
+    print(f"k={cell['k']} seed={cell['seed']} delay={memory.delay} flows={len(flows)} errors={errors}")

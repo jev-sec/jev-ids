@@ -8,7 +8,7 @@ In reading order:
 - `Selector`: per Category, a score (similarity + recency + difficulty) and maximal marginal relevance (MMR) over the visible memory.
 - `mmr`: the picking itself, over one Category's candidates.
 
-Everything is deterministic: the same memory and the same Flow give the same Examples, so repetitions measure Jev's own variation.
+Everything is deterministic: the same memory and the same Flow give the same Examples, so a repeated seed shows Jev's own variation.
 """
 
 import math
@@ -96,7 +96,7 @@ class Selector:
         """The Examples for `flow` at `step`: ceil(k[c]) per Category c, or fewer when the Category has fewer distinct candidates.
 
         The final order is a shuffle seeded by the Flow alone, so no Detector sees
-        the Examples grouped by Category and a repetition sees the same request.
+        the Examples grouped by Category and a run that repeats a seed sends the same request.
 
         Args:
             memory: the labeled Flows the step may use.

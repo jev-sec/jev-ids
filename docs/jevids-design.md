@@ -44,7 +44,7 @@ The `Memory` holds every labeled Flow that has ended before "now". A pool Flow b
 
 The delay stands for the time between an attack slipping through and someone noticing it. D is the same for every Flow. A D tied to Flow Duration was rejected, because duration is a property of each attack and says nothing about its discovery. Feedback is assumed complete, so every judged Flow eventually gets its true label, missed attacks included. The paper declares this assumption.
 
-D is a scenario, reported and never tuned. Each novel attack name of the CIC-IDS2017 `paper-v3` split arrives in one burst: `SSH-Patator` at positions 414 to 556, `DoS Slowhttptest` at 753 to 849 and `Infiltration - Portscan` at 1,279 to 1,473, so a burst spans 97 to 195 positions. D = 1 is the immediate best case, D = 50 lets a burst's first Flows come back while it lasts, and D = 200 is longer than the longest burst. At D = 1, 50 and 200 the split holds 3, 93 and 309 novel Flows at first contact. On TRUSTLab only D = 200 runs, and 338 of its 403 novel Flows meet Jev at first contact.
+D is a scenario, reported and never tuned. Each novel attack name of the CIC-IDS2017 `paper` split arrives in one burst: `SSH-Patator` at positions 414 to 556, `DoS Slowhttptest` at 753 to 849 and `Infiltration - Portscan` at 1,279 to 1,473, so a burst spans 97 to 195 positions. D = 1 is the immediate best case, D = 50 lets a burst's first Flows come back while it lasts, and D = 200 is longer than the longest burst. At D = 1, 50 and 200 the split holds 3, 93 and 309 novel Flows at first contact. On TRUSTLab only D = 200 runs, and 338 of its 403 novel Flows meet Jev at first contact.
 
 ### D5. `KController`: mirrored AIMD, one k per Category
 
@@ -65,7 +65,7 @@ Examples used for c = ceil(k_c), or every visible Example of c when fewer exist.
 | β            | 2     | Double on error                                                                   |
 | α            | 1     | Each success removes 1/k_c, so k drops by one Example per window of k_c successes |
 
-k_max comes from a pilot on CIC-IDS2017 with random Examples, where Jev scored F1 0.942 at k = 4 and 0.943 at k = 8 while its cost went from 557 to 1,063 USD per 1M Flows. The controller reacts when the label arrives, at t + D. An error is `category_pred` differing from the true Category, a missing Category answer included. A row with `error` is ignored. Every stream cell starts a fresh controller at k₀ = 1 for every Category, and every row carries `k_by_category`, the k of each Category before the ceiling. `jev-ids run --control aimd --k 1` runs it, and `--beta` changes β.
+k_max comes from a pilot on CIC-IDS2017 with random Examples. Jev scored F1 0.942 at k = 4 and 0.943 at k = 8, while its cost went from 557 to 1,063 USD per 1M Flows. `uv run jev-ids metrics results/20261027T150927.433285Z-cicids2017-jev-pilot` gives these numbers again. The controller reacts when the label arrives, at t + D. An error is `category_pred` differing from the true Category, a missing Category answer included. A row with `error` is ignored. Every stream cell starts a fresh controller at k₀ = 1 for every Category, and every row carries `k_by_category`, the k of each Category before the ceiling. `jev-ids run --control aimd --k 1` runs it, and `--beta` changes β.
 
 On TRUSTLab the controller meets a limit of the TypeSafe API. With 16 Categories, 10 of them had reached k = 8 by step 1,513 of the `paper` stream, and from there 144, 154 and 155 calls of seeds 0, 1 and 2 failed with HTTP 400 `max_tokens_exceeded`. The largest answered call held 33,047 input tokens. A lower k_max would change this decision, and the user kept it as it is on 2026-11-16. The full JevIDS covers these Flows with the matched kNN (D12).
 
@@ -84,7 +84,7 @@ then add the nearest benign Flow of the Memory when the pick left it out
 - Distance is Euclidean over the features standardised with the pool's mean and standard deviation, with Protocol one-hot. A constant feature keeps scale 1.
 - Difficulty is 1 when Jev was wrong on e, 1 − |2 · p_attack − 1| when it was right, and 0.5 for pool Flows and for failed calls.
 - Redundancy is 1 / (1 + distance), in [0, 1]. MMR (maximal marginal relevance) keeps near copies of one burst from filling the slots. An exact copy of a chosen Example is never chosen.
-- The Examples of a request are shuffled with a seed made of the Flow's `row_id` alone, so the same Flow gets the same request in every repetition.
+- The Examples of a request are shuffled with a seed made of the Flow's `row_id` alone, so the same Flow gets the same request in every run.
 
 The nearest benign Flow joined on 2026-11-02 (`--selection score+nearest`). Without it, similarity entered the score only as a rank among tens of thousands of benign candidates, so recency and difficulty chose a benign Example far from the Flow under test, and benign web Flows were flagged as DoS. On 200 benign web Flows of CIC-IDS2017 it cut false alarms from 28 to 8 (McNemar p = 0.000088), with no significant loss of caught attacks.
 
@@ -129,12 +129,12 @@ The matched kNN reads as many Flows as Jev reads Examples, so the gap between th
 
 The battery measures Jev alone, its ablations and the baselines on test splits that no earlier run had read. The runs go to `results/zeroday-<dataset>/`, and a run that ends with no error row leaves a stamp in `v2-done/`.
 
-| Dataset     | Split      | Flows | BENIGN | Novel | Novel at first contact (D = 1 / 50 / 200) |
-| ----------- | ---------- | ----- | ------ | ----- | ----------------------------------------- |
-| CIC-IDS2017 | `paper-v3` | 2,000 | 1,046  | 309   | 3 / 93 / 309                              |
-| TRUSTLab    | `paper`    | 2,000 | 798    | 403   | only D = 200 runs, 338                    |
+| Dataset     | Split   | Flows | BENIGN | Novel | Novel at first contact (D = 1 / 50 / 200) |
+| ----------- | ------- | ----- | ------ | ----- | ----------------------------------------- |
+| CIC-IDS2017 | `paper` | 2,000 | 1,046  | 309   | 3 / 93 / 309                              |
+| TRUSTLab    | `paper` | 2,000 | 798    | 403   | only D = 200 runs, 338                    |
 
-`paper-v3` was drawn on 2026-11-15 with seed 20261115 and `--min-novel 250` from the rows of `test.csv` that earlier splits held out. TRUSTLab's `paper` was drawn with seed 20261116.
+CIC-IDS2017's `paper` was drawn on 2026-11-15 as `paper-v3`, with seed 20261115 and `--min-novel 250`, from the rows of `test.csv` that earlier splits held out, and renamed on 2026-11-19. TRUSTLab's `paper` was drawn with seed 20261116.
 
 The CIC-IDS2017 battery holds 9 Jev runs and 12 baseline runs, all stamped.
 

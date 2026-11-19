@@ -67,7 +67,6 @@ def smoke_spec(
     card: Path,
     detector: str = "fake",
     k_values: tuple[int | None, ...] = (0,),
-    reps: int = 1,
 ) -> run.RunSpec:
     """A smoke-split spec writing next to the dataset."""
     return run.RunSpec(
@@ -76,7 +75,6 @@ def smoke_spec(
         split="smoke",
         k_values=k_values,
         seeds=(0,),
-        reps=reps,
         results_dir=card.parent.parent.parent / "results",
     )
 
@@ -84,16 +82,16 @@ def smoke_spec(
 def test_execute_covers_every_cell_in_order_and_writes_the_three_files(card: Path, capsys: pytest.CaptureFixture[str]) -> None:
     detector = FakeDetector()
     config = dataset.load_config(card)
-    spec = smoke_spec(card, k_values=(0, 1), reps=2)
+    spec = smoke_spec(card, k_values=(0, 1))
 
     run_dir = run.execute(spec, detector, config, FLOWS, TRAIN)
 
     predictions = records.read_predictions(run_dir)
-    assert len(predictions) == 2 * 1 * 2 * 3
-    # Expecting k outermost, then rep, then the Flows, with 3 Examples at k = 1.
+    assert len(predictions) == 2 * 1 * 3
+    # Expecting k outermost, then the Flows, with 3 Examples at k = 1.
     zero_shot = [(100, 0), (101, 0), (102, 0)]
     one_shot = [(100, 3), (101, 3), (102, 3)]
-    assert detector.calls == zero_shot * 2 + one_shot * 2
+    assert detector.calls == zero_shot + one_shot
     assert {prediction["n_examples"] for prediction in predictions} == {0, 3}
     shared = {
         *("run_id", "dataset", "detector", "model", "split", "prompt_hash", "record", "selection", "control", "beta"),
@@ -126,9 +124,9 @@ def test_execute_covers_every_cell_in_order_and_writes_the_three_files(card: Pat
     # Expecting the full commit id, with `-dirty` appended while the tree has uncommitted changes.
     assert re.fullmatch(r"[0-9a-f]{40}(-dirty)?", config_json["code_commit"])
     lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == "k=0 seed=0 rep=0 flows=3 errors=0"
+    assert lines[0] == "k=0 seed=0 flows=3 errors=0"
     # Expecting one line per cell, then `done:`.
-    assert len(lines) == 4 + 1
+    assert len(lines) == 2 + 1
 
 
 def test_redo_errors_judges_the_failed_and_the_missing_flows_in_their_cells(card: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -162,8 +160,8 @@ def test_redo_errors_judges_the_failed_and_the_missing_flows_in_their_cells(card
     assert [(entry["error_rows"], entry["missing_flows"]) for entry in config_json["redone"]] == [(2, 1)]
     lines = capsys.readouterr().out.splitlines()
     assert lines[-3:] == [
-        "k=1 seed=0 rep=0 flows=1 errors=0",
-        "k=2 seed=0 rep=0 flows=2 errors=0",
+        "k=1 seed=0 flows=1 errors=0",
+        "k=2 seed=0 flows=2 errors=0",
         f"redone: 2 error rows and 1 missing flows of {run_dir}",
     ]
     # Refusing a run whose config.json names another model, because one run_id would then mix two experiments.
@@ -187,9 +185,9 @@ def test_run_from_spec_reads_the_dataset_and_fits_the_forest_on_the_pool(
     card: Path,
 ) -> None:
     # Running end to end from disk with the one Detector that needs no network.
-    run_dir = run.run_from_spec(smoke_spec(card, "random_forest", k_values=(1, None), reps=2))
+    run_dir = run.run_from_spec(smoke_spec(card, "random_forest", k_values=(1, None)))
     predictions = records.read_predictions(run_dir)
-    assert len(predictions) == 2 * 2 * 3
+    assert len(predictions) == 2 * 3
     assert {prediction["n_examples"] for prediction in predictions} == {3, len(TRAIN)}
     assert {prediction["prompt_hash"] for prediction in predictions} == {None}
     assert all(prediction["classification_verdict"] in (0, 1) for prediction in predictions)

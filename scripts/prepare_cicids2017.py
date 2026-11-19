@@ -5,8 +5,9 @@ https://intrusion-detection.distrinet-research.be/CNS2022/Dataset_Download.html 
 
     uv run python -m scripts.prepare_cicids2017
 
-The test split `splits/paper-v3.csv` is kept as a file. It was drawn with `draw_split --name paper-v3 --size 2000 --seed 20261115
---min-novel 250` while seven earlier splits were on disk, so the same command on a fresh folder draws other rows.
+The test split `splits/paper.csv` is kept as a file. It was drawn with `draw_split --name paper-v3 --size 2000 --seed 20261115
+--min-novel 250` while seven earlier splits were on disk, one of them named `paper`, and renamed on 2026-11-19. The same command
+on a fresh folder therefore draws other rows.
 
 The zip is the relabelled CIC-IDS2017 of Liu et al., "Error Prevalence in NIDS datasets: A Case Study on CIC-IDS-2017
 and CSE-CIC-IDS-2018", IEEE CNS 2022, pp. 254-262, with one CSV per weekday of the capture (3 to 7 July 2017) and 91 columns.

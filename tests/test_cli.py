@@ -1,4 +1,4 @@
-"""CLI wiring for the run, redo-errors, metrics, compare, sign-test and threshold subcommands."""
+"""CLI wiring for the run, redo-errors, metrics, compare and threshold subcommands."""
 
 import json
 from dataclasses import asdict
@@ -29,11 +29,11 @@ def test_run_builds_a_spec_from_the_arguments(tmp_path: Path, capsys: pytest.Cap
     card = write_dataset(tmp_path / "data", CONFIG, splits)
     results = tmp_path / "results"
     argv = ["run", "--dataset", str(card), "--detector", "random_forest", "--split", "smoke"]
-    argv += ["--k", "1,all", "--seeds", "1", "--reps", "3", "--model", "m", "--results-dir", str(results)]
+    argv += ["--k", "1,all", "--seeds", "1", "--model", "m", "--results-dir", str(results)]
     assert cli.main(argv) == 0
     (run_dir,) = results.iterdir()
     stored = json.loads((run_dir / "config.json").read_text(encoding="utf-8"))
-    expected = run.RunSpec("random_forest", card, "smoke", (1, None), (1,), reps=3, model_id="m", results_dir=results, jobs=-1)
+    expected = run.RunSpec("random_forest", card, "smoke", (1, None), (1,), model_id="m", results_dir=results, jobs=-1)
     assert stored["spec"] == json.loads(json.dumps(asdict(expected), default=str))
     # Reading the defaults of a jev run from the parser `main` uses, because running Jev needs the network.
     args = cli.build_parser().parse_args(["run", "--dataset", str(card), "--detector", "jev", "--split", "pilot"])
@@ -82,19 +82,6 @@ def test_compare_selects_the_subset_cuts_to_ks_and_prints_csv(tmp_path: Path, ca
     assert lines[1] == "1,,0,0,1,1,1,0,1.0,1.0,0.0"
     with pytest.raises(SystemExit, match="come together"):
         cli.main(["compare", "--a", "a", "--b", "b", "--k-a", "0"])
-
-
-def test_sign_test_prints_every_subset_with_holm_p(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    records.append_prediction(tmp_path / "a", make_prediction(0, 1, 1.0, novel_attack=True))
-    records.append_prediction(tmp_path / "b", make_prediction(0, 1, 0.0, novel_attack=True))
-    assert cli.main(["sign-test", "--a", str(tmp_path / "a"), "--b", str(tmp_path / "b")]) == 0
-    lines = capsys.readouterr().out.splitlines()
-    assert lines[0] == "subset,k,flows,a_better,b_better,sign_p,holm_p"
-    # Skipping the known subset, which holds no flow, so only `all` and `novel` give a row, and Holm caps both adjusted p-values at 1.
-    assert lines[1:] == ["all,1,1,1,0,1.0,1.0", "novel,1,1,1,0,1.0,1.0"]
-    # Cutting B at 0.0 turns its miss into an alert, so the Flow ties and favours neither run.
-    assert cli.main(["sign-test", "--a", str(tmp_path / "a"), "--b", str(tmp_path / "b"), "--threshold-b", "0.0"]) == 0
-    assert capsys.readouterr().out.splitlines()[1] == "all,1,1,0,0,1.0,1.0"
 
 
 def test_threshold_prints_the_cut_and_metrics_and_compare_take_verdicts_again(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

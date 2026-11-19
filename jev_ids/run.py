@@ -63,7 +63,6 @@ class RunSpec:
         split: the split to judge, a file under `data/<name>/splits/`.
         k_values: Examples per Category to try; None means the whole pool (the forests).
         seeds: the seeds of the Example draws.
-        reps: how often each (k, seed) cell is repeated, for stability.
         model_id: the Anthropic model, for `llm:sonnet`, or None for its default.
         results_dir: where run directories are created.
         jobs: CPU cores each forest fit may use (-1 for all).
@@ -86,7 +85,6 @@ class RunSpec:
     split: str
     k_values: tuple[int | None, ...]
     seeds: tuple[int, ...]
-    reps: int = 1
     model_id: str | None = None
     results_dir: Path = RESULTS_DIR
     delay: int | None = None
@@ -255,29 +253,26 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
         print(f"done: {run_dir}")
         return run_dir
     for k, seed in itertools.product(spec.k_values, spec.seeds):
-        # Drawing the Examples once per (k, seed) and reusing them in every rep,
-        # so the Random Forest keeps its fit across the repetitions. k = None is the whole pool.
+        # Drawing the Examples once per (k, seed). k = None is the whole pool.
         examples = list(train) if k is None else sample_examples(train, k, seed, config["categories"])
-        for repetition in range(spec.reps):
-            judge(
-                run_dir,
-                detector,
-                flows,
-                examples,
-                {
-                    **run_fields,
-                    "k": k,
-                    "seed": seed,
-                    "repetition": repetition,
-                    "n_examples": len(examples),
-                },
-            )
+        judge(
+            run_dir,
+            detector,
+            flows,
+            examples,
+            {
+                **run_fields,
+                "k": k,
+                "seed": seed,
+                "n_examples": len(examples),
+            },
+        )
     print(f"done: {run_dir}")
     return run_dir
 
 
 def shared_fields(spec: RunSpec, detector: Detector, config: Config, run_id: str) -> dict[str, Any]:
-    """The fields every row of a run shares, to which a cell adds k, seed, rep and the number of Examples.
+    """The fields every row of a run shares, to which a cell adds k, seed and the number of Examples.
 
     `record` is in every row because the prompt hash does not change with it. The same template is filled with full or compact values.
     """
@@ -292,6 +287,8 @@ def shared_fields(spec: RunSpec, detector: Detector, config: Config, run_id: str
         "selection": selection_of(spec, detector.name),
         "control": spec.control if spec.detector not in WHOLE_MEMORY else None,
         "beta": spec.beta if spec.control == "aimd" else None,
+        # Keeping `repetition` at 0, because every stored run carries it and `compare` pairs rows by it.
+        "repetition": 0,
     }
 
 
@@ -302,7 +299,7 @@ def execute_stream(
     data: tuple[Sequence[Flow], Sequence[Flow]],
     run_fields: dict[str, Any],
 ) -> None:
-    """Every (k, seed, rep) cell as a stream over the split, each with a fresh memory.
+    """Every (k, seed) cell as a stream over the split, each with a fresh memory.
 
     With the `score` selection the `Selector` gives every Category ceil(k) Examples.
     Its space is built once for the run, because it only depends on the pool.
@@ -324,16 +321,15 @@ def execute_stream(
     selection = run_fields["selection"]
     anchor = config["benign"] if selection == "score+nearest" else None
     selector = Selector(Space(dataset.vocabulary(train, config), train), anchor) if selection in SCORED else None
-    for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
+    for k, seed in itertools.product(spec.k_values, spec.seeds):
         # Giving each cell a fresh memory and a fresh controller, so what one cell learned never leaks into the next.
         memory = Memory(train, config["categories"], spec.delay, names)
         controller = KController(config["categories"], spec.beta) if spec.control == "aimd" else None
-        resume(memory, flows, [row for row in done if (row["k"], row["seed"], row["repetition"]) == (k, seed, repetition)])
+        resume(memory, flows, [row for row in done if (row["k"], row["seed"]) == (k, seed)])
         cell = {
             **run_fields,
             "k": k,
             "seed": seed,
-            "repetition": repetition,
             "delay": spec.delay,
         }
         stream_cell(run_dir, detector, memory, flows, cell, choose_with(selector, k, config["categories"], seed, controller))
@@ -374,7 +370,7 @@ def judge(run_dir: Path, detector: Detector, flows: Sequence[Flow], examples: Se
         prediction = complete_prediction(detector.predict(flow, examples), flow, cell)
         append_prediction(run_dir, prediction)
         errors += int(prediction.get("error") is not None)
-    print(f"k={cell['k']} seed={cell['seed']} rep={cell['repetition']} flows={len(flows)} errors={errors}")
+    print(f"k={cell['k']} seed={cell['seed']} flows={len(flows)} errors={errors}")
 
 
 def run_from_spec(spec: RunSpec) -> Path:
@@ -411,7 +407,6 @@ def redo_errors(run_dir: Path) -> Path:
         split=fields["split"],
         k_values=tuple(fields["k_values"]),
         seeds=tuple(fields["seeds"]),
-        reps=fields["reps"],
         model_id=fields["model_id"],
         results_dir=run_dir.parent,
         # Defaulting to `full`, because a run made before the compact record existed read the values in full.
@@ -434,24 +429,23 @@ def redo_errors(run_dir: Path) -> Path:
     run_fields = shared_fields(spec, detector, config, stored["run_id"])
     if spec.delay is not None:
         execute_stream(spec, detector, config, (flows, train), run_fields)
-        cells = len(spec.k_values) * len(spec.seeds) * spec.reps
+        cells = len(spec.k_values) * len(spec.seeds)
         return record_redone(run_dir, stored, 0, cells * len(flows) - len(rows))
     kept = [row for row in rows if row.get("error") is None]
     (run_dir / "predictions.jsonl").write_text("".join(json.dumps(row) + "\n" for row in kept), encoding="utf-8")
     # Marking a Flow done when its cell holds a kept row for it. Everything else in the cell (an error row or no row at all) is judged now.
-    done = {(row["k"], row["seed"], row["repetition"], row["row_id"]) for row in kept}
+    done = {(row["k"], row["seed"], row["row_id"]) for row in kept}
     judged = 0
     # Walking every cell of the spec in the order `execute` walks them. `sample_examples` is deterministic, so the draw is the original one.
-    for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
+    for k, seed in itertools.product(spec.k_values, spec.seeds):
         examples = list(train) if k is None else sample_examples(train, k, seed, config["categories"])
         cell = {
             **run_fields,
             "k": k,
             "seed": seed,
-            "repetition": repetition,
             "n_examples": len(examples),
         }
-        todo = [flow for flow in flows if (k, seed, repetition, flow.row_id) not in done]
+        todo = [flow for flow in flows if (k, seed, flow.row_id) not in done]
         judged += len(todo)
         if todo:
             judge(run_dir, detector, todo, examples, cell)

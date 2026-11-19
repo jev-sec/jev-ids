@@ -1,10 +1,10 @@
-"""The command line: `jev-ids run|redo-errors|metrics|compare|sign-test|threshold|fuse`, also reachable as `python -m jev_ids`.
+"""The command line: `jev-ids run|redo-errors|metrics|compare|threshold|fuse`, also reachable as `python -m jev_ids`.
 
 In reading order:
 
 - `parse_k` and `parse_list`: the list arguments (`--k 0,1,all`).
-- `build_parser`: the seven subcommands and their arguments.
-- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `sign_test_command`, `threshold_command`, `fuse_command`:
+- `build_parser`: the six subcommands and their arguments.
+- `run_command`, `redo_command`, `metrics_command`, `compare_command`, `threshold_command`, `fuse_command`:
   one handler per subcommand, each turning the parsed arguments into calls of `run`, `metrics` or `fusion`.
 - `read_runs`: the rows of the run directories given, cut again at a threshold when one is given.
 - `print_csv`: a table as CSV on stdout.
@@ -56,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     runner = commands.add_parser("run", help="run one detector over one split")
     runner.add_argument("--dataset", required=True, type=Path, help="the card: data/<name>/dataset.json")
     runner.add_argument("--detector", required=True, help="jev, llm:sonnet, random_forest, isolation_forest or knn")
-    runner.add_argument("--split", required=True, help="the split file to judge, such as paper-v3 or validation")
+    runner.add_argument("--split", required=True, help="the split file to judge, such as paper or validation")
     runner.add_argument(
         "--k",
         type=parse_list,
@@ -64,7 +64,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="examples per category, comma separated; `all` for the forests",
     )
     runner.add_argument("--seeds", type=parse_list, default=(0, 1, 2), help="seeds of the example draws")
-    runner.add_argument("--reps", type=int, default=1, help="repetitions of each (k, seed) cell")
     runner.add_argument("--model", help="Anthropic model id, for llm:sonnet")
     runner.add_argument("--results-dir", type=Path, default=run.RESULTS_DIR, help="where the run directory is created")
     runner.add_argument("--delay", type=int, help="stream the split with this feedback delay D, in Flows (docs/jevids-design.md, D4)")
@@ -118,17 +117,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     comparer.add_argument("--k-a", help="cut run A to this k or `all`")
     comparer.add_argument("--k-b", help="cut run B to this k or `all`")
+    # Giving each side its own cut, so Jev alone at its tuned cut can meet a baseline at 0.5 (D9).
+    comparer.add_argument("--threshold-a", type=float, help="take the Verdicts of A again at this cut instead of 0.5 (D9)")
+    comparer.add_argument("--threshold-b", type=float, help="take the Verdicts of B again at this cut instead of 0.5 (D9)")
     comparer.set_defaults(handler=compare_command)
-
-    signer = commands.add_parser("sign-test", help="flow-level sign test of two detectors on every subset and k, Holm-adjusted")
-    signer.add_argument("--a", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector A")
-    signer.add_argument("--b", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector B")
-    signer.set_defaults(handler=sign_test_command)
-
-    # Giving both paired tests a cut per side, so Jev alone at its tuned cut can meet a baseline at 0.5 (D9).
-    for paired in (comparer, signer):
-        paired.add_argument("--threshold-a", type=float, help="take the Verdicts of A again at this cut instead of 0.5 (D9)")
-        paired.add_argument("--threshold-b", type=float, help="take the Verdicts of B again at this cut instead of 0.5 (D9)")
 
     tuner = commands.add_parser("threshold", help="the cut on p_attack with the best mean F1 over the validation runs given (D9)")
     tuner.add_argument("run_dirs", nargs="+", type=Path, help="results/<run_id> directories of the validation stream")
@@ -152,7 +144,6 @@ def run_command(args: argparse.Namespace) -> None:
         split=args.split,
         k_values=args.k,
         seeds=args.seeds,
-        reps=args.reps,
         model_id=args.model,
         results_dir=args.results_dir,
         delay=args.delay,
@@ -185,23 +176,6 @@ def compare_command(args: argparse.Namespace) -> None:
     run_a = metrics.only_subset(read_runs(args.a, args.threshold_a), args.subset)
     run_b = metrics.only_subset(read_runs(args.b, args.threshold_b), args.subset)
     print_csv(metrics.compare(run_a, run_b, across_k))
-
-
-def sign_test_command(args: argparse.Namespace) -> None:
-    """`sign-test`: the flow-level sign test on all flows, known and novel attacks, with Holm's adjustment across every row, as CSV."""
-    run_a, run_b = read_runs(args.a, args.threshold_a), read_runs(args.b, args.threshold_b)
-    table = [
-        {
-            "subset": subset,
-            **row,
-        }
-        for subset in ("all", "known", "novel")
-        for row in metrics.sign_test(metrics.only_subset(run_a, subset), metrics.only_subset(run_b, subset))
-    ]
-    # Adjusting the family of every subset and k together, the 15 comparisons of the paper's Table 4.
-    for row, adjusted in zip(table, metrics.holm([float(row["sign_p"]) for row in table]), strict=True):
-        row["holm_p"] = adjusted
-    print_csv(table)
 
 
 def threshold_command(args: argparse.Namespace) -> None:

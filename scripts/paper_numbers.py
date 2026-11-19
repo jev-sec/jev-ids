@@ -27,10 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "results" / "paper" / "numbers.json"
 PRICE = 0.042e-6
 BASELINES = ("rf", "if", "knn4", "knnmatched")
-DATASETS = {
-    "cicids2017": "paper-v3",
-    "trustlab": "paper",
-}
+DATASETS = ("cicids2017", "trustlab")
 # Naming the stamps of the Jev runs, the lines of `make zeroday-jev`. CIC-IDS2017 repeats D = 50 and D = 1 over three seeds,
 # TRUSTLab over one, and both run the ablations at D = 200.
 ABLATIONS = [f"{config}-d200-s{seed}" for config in ("fixedk1", "noctl") for seed in (0, 1, 2)] + ["nosel-d200-s0", "randomk4-d200-s0"]
@@ -254,9 +251,9 @@ def bursts(rows: list[Prediction], names: dict[int, str]) -> dict[str, Any]:
     return out
 
 
-def dataset_numbers(dataset: str, split: str) -> dict[str, Any]:
-    """Every line and test of one dataset."""
-    with open(ROOT / "data" / dataset / "splits" / f"{split}.csv", encoding="utf-8") as handle:
+def dataset_numbers(dataset: str) -> dict[str, Any]:
+    """Every line and test of one dataset, on its test split `paper`."""
+    with open(ROOT / "data" / dataset / "splits" / "paper.csv", encoding="utf-8") as handle:
         names = {int(row["row_id"]): row["raw_label"] for row in csv.DictReader(handle)}
     calibration = calibration_runs(dataset)
     rule = calibrated_cut(dataset, calibration)
@@ -288,7 +285,7 @@ def dataset_numbers(dataset: str, split: str) -> dict[str, Any]:
 
 def main() -> None:
     """Fuse, measure and compare every run of the battery."""
-    numbers = {dataset: dataset_numbers(dataset, split) for dataset, split in DATASETS.items()}
+    numbers = {dataset: dataset_numbers(dataset) for dataset in DATASETS}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as handle:
         json.dump(numbers, handle, indent=1, default=str)

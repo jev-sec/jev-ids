@@ -141,7 +141,7 @@
     "tokens_per_flow": 3015.6065,
     "usd": 0.253310946,
     "examples_per_flow": 5.525,
-    "run": "20261119T151249.825706Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151249.825706Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.9169401372899616,
      0.969699378522908
@@ -289,7 +289,7 @@
     "tokens_per_flow": 3015.6065,
     "usd": 0.253310946,
     "examples_per_flow": 5.525,
-    "run": "20261115T204354.684965Z-cicids2017-jev-paper-v3",
+    "run": "20261115T204354.684965Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.8152765755524731,
      0.8571428571428571
@@ -437,7 +437,7 @@
     "tokens_per_flow": 3020.1895,
     "usd": 0.253695918,
     "examples_per_flow": 5.5305,
-    "run": "20261119T151250.544322Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151250.544322Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.9198018216750872,
      0.9648727553156328
@@ -585,7 +585,7 @@
     "tokens_per_flow": 3020.1895,
     "usd": 0.253695918,
     "examples_per_flow": 5.5305,
-    "run": "20261115T210051.345326Z-cicids2017-jev-paper-v3",
+    "run": "20261115T210051.345326Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.8131311812711806,
      0.8547717842323651
@@ -733,7 +733,7 @@
     "tokens_per_flow": 3021.165,
     "usd": 0.25377785999999997,
     "examples_per_flow": 5.532,
-    "run": "20261119T151251.236265Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151251.236265Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.9082117538893325,
      0.9621480864234272
@@ -881,7 +881,7 @@
     "tokens_per_flow": 3021.165,
     "usd": 0.25377785999999997,
     "examples_per_flow": 5.532,
-    "run": "20261115T211929.658517Z-cicids2017-jev-paper-v3",
+    "run": "20261115T211929.658517Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.8067885117493473,
      0.8477366255144033
@@ -1029,7 +1029,7 @@
     "tokens_per_flow": 2887.017,
     "usd": 0.242509428,
     "examples_per_flow": 4.7245,
-    "run": "20261119T151251.968134Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151251.968134Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.8333333333333334,
      0.9346733668341709
@@ -1177,7 +1177,7 @@
     "tokens_per_flow": 2887.017,
     "usd": 0.242509428,
     "examples_per_flow": 4.7245,
-    "run": "20261115T213627.791050Z-cicids2017-jev-paper-v3",
+    "run": "20261115T213627.791050Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.5619335347432024,
      0.6391752577319587
@@ -1325,7 +1325,7 @@
     "tokens_per_flow": 3009.363,
     "usd": 0.252786492,
     "examples_per_flow": 5.335,
-    "run": "20261119T151252.631112Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151252.631112Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.8421052631578947,
      0.9418141776780519
@@ -1473,7 +1473,7 @@
     "tokens_per_flow": 3009.363,
     "usd": 0.252786492,
     "examples_per_flow": 5.335,
-    "run": "20261118T182551.238432Z-cicids2017-jev-paper-v3",
+    "run": "20261118T182551.238432Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.5653495440729484,
      0.6458333333333334
@@ -1621,7 +1621,7 @@
     "tokens_per_flow": 2884.147,
     "usd": 0.242268348,
     "examples_per_flow": 4.721,
-    "run": "20261119T151253.293083Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151253.293083Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.8292682926829268,
      0.9387755102040817
@@ -1769,7 +1769,7 @@
     "tokens_per_flow": 2884.147,
     "usd": 0.242268348,
     "examples_per_flow": 4.721,
-    "run": "20261118T182552.932723Z-cicids2017-jev-paper-v3",
+    "run": "20261118T182552.932723Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.5585585585585585,
      0.6391752577319587
@@ -1917,7 +1917,7 @@
     "tokens_per_flow": 2815.374,
     "usd": 0.23649141599999998,
     "examples_per_flow": 4.423,
-    "run": "20261119T151253.978356Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151253.978356Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.1111111111111111,
      0.2222222222222222
@@ -2065,7 +2065,7 @@
     "tokens_per_flow": 2815.374,
     "usd": 0.23649141599999998,
     "examples_per_flow": 4.423,
-    "run": "20261115T215731.660844Z-cicids2017-jev-paper-v3",
+    "run": "20261115T215731.660844Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.039735099337748346,
      0.05217391304347826
@@ -2213,7 +2213,7 @@
     "tokens_per_flow": 2815.994,
     "usd": 0.236543496,
     "examples_per_flow": 4.414,
-    "run": "20261119T151254.670451Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151254.670451Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.11764705882352941,
      0.25
@@ -2361,7 +2361,7 @@
     "tokens_per_flow": 2815.994,
     "usd": 0.236543496,
     "examples_per_flow": 4.414,
-    "run": "20261118T182634.739694Z-cicids2017-jev-paper-v3",
+    "run": "20261118T182634.739694Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.0425531914893617,
      0.05714285714285714
@@ -2509,7 +2509,7 @@
     "tokens_per_flow": 2879.0885,
     "usd": 0.241843434,
     "examples_per_flow": 4.623,
-    "run": "20261119T151255.337532Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151255.337532Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.1111111111111111,
      0.2222222222222222
@@ -2657,7 +2657,7 @@
     "tokens_per_flow": 2879.0885,
     "usd": 0.241843434,
     "examples_per_flow": 4.623,
-    "run": "20261118T182649.223428Z-cicids2017-jev-paper-v3",
+    "run": "20261118T182649.223428Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.04254569973029667,
      0.05660377358490566
@@ -2805,7 +2805,7 @@
     "tokens_per_flow": 2731.279,
     "usd": 0.22942743599999998,
     "examples_per_flow": 4.1095,
-    "run": "20261119T151256.004398Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151256.004398Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.9039655343116763,
      0.964751984126984
@@ -2953,7 +2953,7 @@
     "tokens_per_flow": 2731.279,
     "usd": 0.22942743599999998,
     "examples_per_flow": 4.1095,
-    "run": "20261115T222921.174554Z-cicids2017-jev-paper-v3",
+    "run": "20261115T222921.174554Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.8036410923276983,
      0.8477366255144033
@@ -3101,7 +3101,7 @@
     "tokens_per_flow": 2729.741,
     "usd": 0.22929824399999998,
     "examples_per_flow": 4.1095,
-    "run": "20261119T151256.697477Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151256.697477Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.9134564238952536,
      0.9675350943554827
@@ -3249,7 +3249,7 @@
     "tokens_per_flow": 2729.741,
     "usd": 0.22929824399999998,
     "examples_per_flow": 4.1095,
-    "run": "20261118T181244.719402Z-cicids2017-jev-paper-v3",
+    "run": "20261118T181244.719402Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.8110236220472441,
      0.8547717842323651
@@ -3397,7 +3397,7 @@
     "tokens_per_flow": 2729.8055,
     "usd": 0.229303662,
     "examples_per_flow": 4.1095,
-    "run": "20261119T151257.436354Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151257.436354Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.9099836333878887,
      0.9664
@@ -3545,7 +3545,7 @@
     "tokens_per_flow": 2729.8055,
     "usd": 0.229303662,
     "examples_per_flow": 4.1095,
-    "run": "20261118T181244.702464Z-cicids2017-jev-paper-v3",
+    "run": "20261118T181244.702464Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.8057104078389831,
      0.8512396694214877
@@ -3693,7 +3693,7 @@
     "tokens_per_flow": 5750.4565,
     "usd": 0.483038346,
     "examples_per_flow": 13.43,
-    "run": "20261119T151258.222892Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151258.222892Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.8392531326541479,
      0.929159802306425
@@ -3841,7 +3841,7 @@
     "tokens_per_flow": 5750.4565,
     "usd": 0.483038346,
     "examples_per_flow": 13.43,
-    "run": "20261115T224237.401895Z-cicids2017-jev-paper-v3",
+    "run": "20261115T224237.401895Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.7794871794871795,
      0.8241610738255034
@@ -3989,7 +3989,7 @@
     "tokens_per_flow": 5758.854,
     "usd": 0.483743736,
     "examples_per_flow": 13.43,
-    "run": "20261119T151258.997407Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151258.997407Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.8506944444444444,
      0.9367109123361304
@@ -4137,7 +4137,7 @@
     "tokens_per_flow": 5758.854,
     "usd": 0.483743736,
     "examples_per_flow": 13.43,
-    "run": "20261118T181244.691114Z-cicids2017-jev-paper-v3",
+    "run": "20261118T181244.691114Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.781491002570694,
      0.8292748403994107
@@ -4285,7 +4285,7 @@
     "tokens_per_flow": 5760.096,
     "usd": 0.48384806399999997,
     "examples_per_flow": 13.43,
-    "run": "20261119T151259.699780Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151259.699780Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.8460169439337023,
      0.9277345364375258
@@ -4433,7 +4433,7 @@
     "tokens_per_flow": 5760.096,
     "usd": 0.48384806399999997,
     "examples_per_flow": 13.43,
-    "run": "20261118T181244.557550Z-cicids2017-jev-paper-v3",
+    "run": "20261118T181244.557550Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.7910567137692955,
      0.8373983739837398
@@ -4581,7 +4581,7 @@
     "tokens_per_flow": 3470.2955,
     "usd": 0.291504822,
     "examples_per_flow": 7.3925,
-    "run": "20261119T151300.411379Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151300.411379Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.7199926560587515,
      0.7757846814028959
@@ -4729,7 +4729,7 @@
     "tokens_per_flow": 3470.2955,
     "usd": 0.291504822,
     "examples_per_flow": 7.3925,
-    "run": "20261115T222131.079770Z-cicids2017-jev-paper-v3",
+    "run": "20261115T222131.079770Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.5162907268170426,
      0.5597826086956522
@@ -4877,7 +4877,7 @@
     "tokens_per_flow": 5177.542,
     "usd": 0.434913528,
     "examples_per_flow": 12.436,
-    "run": "20261119T151301.150872Z-cicids2017-fusion-paper-v3",
+    "run": "20261119T151301.150872Z-cicids2017-fusion-paper",
     "f1_novel_ci": [
      0.7060333761232349,
      0.7770364832379723
@@ -5025,7 +5025,7 @@
     "tokens_per_flow": 5177.542,
     "usd": 0.434913528,
     "examples_per_flow": 12.436,
-    "run": "20261115T225743.218409Z-cicids2017-jev-paper-v3",
+    "run": "20261115T225743.218409Z-cicids2017-jev-paper",
     "f1_novel_ci": [
      0.5532676812891674,
      0.5908221797323135
@@ -5173,7 +5173,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45322.635,
-    "run": "20261115T231252.699560Z-cicids2017-random_forest-paper-v3",
+    "run": "20261115T231252.699560Z-cicids2017-random_forest-paper",
     "f1_novel_ci": [
      0.09846153846153846,
      0.6081863042818095
@@ -5321,7 +5321,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45322.635,
-    "run": "20261116T173324.985102Z-cicids2017-isolation_forest-paper-v3",
+    "run": "20261116T173324.985102Z-cicids2017-isolation_forest-paper",
     "f1_novel_ci": [
      0.3713942307692308,
      0.3713942307692308
@@ -5469,7 +5469,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45322.635,
-    "run": "20261116T173702.349703Z-cicids2017-knn-paper-v3",
+    "run": "20261116T173702.349703Z-cicids2017-knn-paper",
     "f1_novel_ci": [
      0.19298245614035087,
      0.5891214466252688
@@ -5617,7 +5617,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45322.635,
-    "run": "20261116T173916.816583Z-cicids2017-knn-paper-v3",
+    "run": "20261116T173916.816583Z-cicids2017-knn-paper",
     "f1_novel_ci": [
      0.2138728323699422,
      0.6239631268436574
@@ -5765,7 +5765,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45463.2975,
-    "run": "20261116T174333.434461Z-cicids2017-random_forest-paper-v3",
+    "run": "20261116T174333.434461Z-cicids2017-random_forest-paper",
     "f1_novel_ci": [
      0.19414494975302332,
      0.7347136273864384
@@ -5913,7 +5913,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45463.2975,
-    "run": "20261116T183657.015558Z-cicids2017-isolation_forest-paper-v3",
+    "run": "20261116T183657.015558Z-cicids2017-isolation_forest-paper",
     "f1_novel_ci": [
      0.15097402597402598,
      0.15097402597402598
@@ -6061,7 +6061,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45463.2975,
-    "run": "20261116T184033.636646Z-cicids2017-knn-paper-v3",
+    "run": "20261116T184033.636646Z-cicids2017-knn-paper",
     "f1_novel_ci": [
      0.17647058823529413,
      0.7083333333333334
@@ -6209,7 +6209,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45463.2975,
-    "run": "20261116T184246.448000Z-cicids2017-knn-paper-v3",
+    "run": "20261116T184246.448000Z-cicids2017-knn-paper",
     "f1_novel_ci": [
      0.17473617560151963,
      0.697986577181208
@@ -6357,7 +6357,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45511.685,
-    "run": "20261116T184809.910274Z-cicids2017-random_forest-paper-v3",
+    "run": "20261116T184809.910274Z-cicids2017-random_forest-paper",
     "f1_novel_ci": [
      0.15384615384615385,
      0.5
@@ -6505,7 +6505,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45511.685,
-    "run": "20261116T204116.535931Z-cicids2017-isolation_forest-paper-v3",
+    "run": "20261116T204116.535931Z-cicids2017-isolation_forest-paper",
     "f1_novel_ci": [
      0.005703422053231939,
      0.005703422053231939
@@ -6653,7 +6653,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45511.685,
-    "run": "20261116T210748.607752Z-cicids2017-knn-paper-v3",
+    "run": "20261116T210748.607752Z-cicids2017-knn-paper",
     "f1_novel_ci": [
      0.15384615384615385,
      0.5
@@ -6801,7 +6801,7 @@
     "tokens_per_flow": 0.0,
     "usd": 0.0,
     "examples_per_flow": 45511.685,
-    "run": "20261116T213416.787567Z-cicids2017-knn-paper-v3",
+    "run": "20261116T213416.787567Z-cicids2017-knn-paper",
     "f1_novel_ci": [
      0.125,
      0.5
@@ -6949,7 +6949,7 @@
     "tokens_per_flow": 3809.9485,
     "usd": 15.804844,
     "examples_per_flow": 9.3875,
-    "run": "20261117T162116.616751Z-cicids2017-llm-sonnet-paper-v3",
+    "run": "20261117T162116.616751Z-cicids2017-llm-sonnet-paper",
     "f1_novel_ci": [
      0.8675015454596544,
      0.9786535303776683
@@ -7097,7 +7097,7 @@
     "tokens_per_flow": 3812.822,
     "usd": 15.817008,
     "examples_per_flow": 9.3725,
-    "run": "20261117T184041.498973Z-cicids2017-llm-sonnet-paper-v3",
+    "run": "20261117T184041.498973Z-cicids2017-llm-sonnet-paper",
     "f1_novel_ci": [
      0.8772547343086959,
      0.9768211920529801
@@ -7245,7 +7245,7 @@
     "tokens_per_flow": 3799.2615,
     "usd": 15.763615999999999,
     "examples_per_flow": 9.326,
-    "run": "20261117T184042.268022Z-cicids2017-llm-sonnet-paper-v3",
+    "run": "20261117T184042.268022Z-cicids2017-llm-sonnet-paper",
     "f1_novel_ci": [
      0.8774313503861095,
      0.9837133550488599

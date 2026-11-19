@@ -38,7 +38,7 @@ _Avoid_: shot, demonstration, training row.
 The number of Examples per Category given to a Detector. k = 4 with six Categories means 24 Examples.
 
 **Split**:
-A frozen, seeded sample of a Dataset's Flows, the Flows a Run judges. `paper-v3` of CIC-IDS2017 and `paper` of TRUSTLab are the test Splits, and `validation` of each development Dataset is the Stream the Cuts are taken on.
+A frozen, seeded sample of a Dataset's Flows, the Flows a Run judges. `paper` is the test Split of CIC-IDS2017 and of TRUSTLab, and `validation` of each development Dataset is the Stream the Cuts are taken on.
 _Avoid_: subset, sample, test set.
 
 **Discordant pair**:
@@ -82,7 +82,7 @@ Jev's per-question number for a `choice` question, derived from how spread out t
 _Avoid_: certainty, probability.
 
 **Run**:
-One execution of one Detector over one Split of one Dataset, for one k, one Delay and its seeds and repetitions.
+One execution of one Detector over one Split of one Dataset, for one k, one Delay and its seeds.
 _Avoid_: experiment, job.
 
 ### Stream

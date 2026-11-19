@@ -12,7 +12,7 @@ The package, in reading order:
 - `fusion`: the alarm of the full JevIDS, from its Jev runs and its matched kNN run.
 - `records`: the Prediction row and the three files of a run.
 - `metrics`: summary tables and paired comparisons computed from those rows.
-- `cli`: the `run`, `redo-errors`, `metrics`, `compare`, `sign-test`, `threshold` and `fuse` subcommands.
+- `cli`: the `run`, `redo-errors`, `metrics`, `compare`, `threshold` and `fuse` subcommands.
 """
 
 from pathlib import Path
