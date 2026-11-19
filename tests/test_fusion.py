@@ -1,4 +1,4 @@
-"""The Fusion of a Jev run and a matched kNN run, through the `fuse` subcommand."""
+"""The full JevIDS, built from a Jev run and a matched kNN run, through the `fuse` subcommand."""
 
 import json
 from pathlib import Path

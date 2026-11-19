@@ -1,8 +1,8 @@
 """Draw one proportional split from a dataset's test file (or its pool), disjoint from every split already on disk.
 
-Run from the repository root. The `paper` split of NSL-KDD was drawn with:
+Run from the repository root. The `paper` split of TRUSTLab was drawn with:
 
-    uv run python -m scripts.draw_split --dataset data/nsl-kdd --name paper --size 2000 --min-novel 300
+    uv run python -m scripts.draw_split --dataset data/trustlab --name paper --size 2000 --seed 20261116
 
 The rows of `test.csv` are shuffled once with the seed and the first `--size` rows whose `row_id` no other split file holds are taken: a
 uniform sample keeps the file's mix of Categories and of novel attacks, so the split is proportional, and skipping the taken rows keeps it
@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", type=Path, required=True, help="folder holding test.csv and splits/")
     parser.add_argument("--name", required=True, help="the split to write, splits/<name>.csv")
     parser.add_argument("--size", type=int, required=True, help="rows to draw")
-    parser.add_argument("--seed", type=int, default=20260920, help="the seed the other NSL-KDD splits were drawn with")
+    parser.add_argument("--seed", type=int, default=20260920, help="the seed of the draw")
     parser.add_argument("--min-novel", type=int, default=0, help="refuse a draw with fewer novel-attack rows than this")
     parser.add_argument("--source", default="test.csv", help="the file to draw from, in the dataset folder: test.csv or pool.csv")
     return parser.parse_args()

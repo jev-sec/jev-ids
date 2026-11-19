@@ -7,8 +7,7 @@ import numpy as np
 import pytest
 
 from jev_ids import selector, stream
-from jev_ids.dataset import Flow
-from jev_ids.detectors.random_forest import vocabulary
+from jev_ids.dataset import Flow, vocabulary
 from tests.helpers import CONFIG, make_flow, make_prediction
 
 START = datetime(2017, 7, 3, 12, 0)
@@ -47,7 +46,8 @@ def test_space_standardises_numbers_and_leaves_the_one_hot_columns() -> None:
 
 
 def test_two_identical_flows_are_never_chosen_together() -> None:
-    # Running the proof of stage 3 (docs/jevids-design.md), where index 1 copies index 0 and scores higher and index 2 is near both.
+    # Running the proof of the `Selector` (docs/jevids-design.md, D6),
+    # where index 1 copies index 0 and scores higher and index 2 is near both.
     # The copy is skipped even though the formula alone would prefer it, and with nothing but copies left the Category gets fewer Examples.
     points = np.asarray([[0.0, 0.0], [0.0, 0.0], [0.01, 0.0]])
     assert selector.mmr(points, np.asarray([3.0, 2.9, 2.0]), 2) == [0, 2]

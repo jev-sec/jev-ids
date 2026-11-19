@@ -1,21 +1,9 @@
 {
   "sizes": {
-    "smoke": 5,
-    "internal": 50,
-    "pilot": 300,
-    "paper": 2000,
-    "validation": 300,
-    "selector-test": 400,
-    "paper-v2": 2000
+    "paper-v3": 2000
   },
   "novel_attack_rows": {
-    "smoke": 2,
-    "internal": 7,
-    "pilot": 48,
-    "paper": 300,
-    "validation": 0,
-    "selector-test": 100,
-    "paper-v2": 293
+    "paper-v3": 309
   },
   "dataset": "CIC-IDS2017 improved, Liu et al., IEEE CNS 2022",
   "source_files": {
@@ -90,75 +78,32 @@
   },
   "prepared_on": "2026-10-27",
   "draws": {
-    "smoke": {
-      "seed": 20261027,
-      "source": "test.csv",
-      "disjoint_from": [],
-      "drawn_on": "2026-10-27"
-    },
-    "internal": {
-      "seed": 20261027,
-      "source": "test.csv",
-      "disjoint_from": [
-        "smoke"
-      ],
-      "drawn_on": "2026-10-27"
-    },
-    "pilot": {
-      "seed": 20261027,
-      "source": "test.csv",
-      "disjoint_from": [
-        "internal",
-        "smoke"
-      ],
-      "drawn_on": "2026-10-27"
-    },
-    "paper": {
-      "seed": 20261027,
-      "source": "test.csv",
-      "disjoint_from": [
-        "internal",
-        "pilot",
-        "smoke"
-      ],
-      "drawn_on": "2026-10-27"
-    },
-    "validation": {
-      "seed": 20261027,
-      "source": "pool.csv",
-      "disjoint_from": [
-        "internal",
-        "paper",
-        "pilot",
-        "smoke"
-      ],
-      "drawn_on": "2026-10-27"
-    },
-    "selector-test": {
-      "seed": 0,
+    "paper-v3": {
+      "seed": 20261115,
       "source": "test.csv",
       "disjoint_from": [
         "internal",
         "paper",
-        "pilot",
-        "smoke",
-        "validation"
-      ],
-      "drawn_on": "2026-11-02",
-      "rows": "200 BENIGN Flows of TCP to port 80 or 443 from Wednesday to Friday, 100 novel attacks and 100 known ones, random.Random(0).sample of each"
-    },
-    "paper-v2": {
-      "seed": 20261102,
-      "source": "test.csv",
-      "disjoint_from": [
-        "internal",
-        "paper",
+        "paper-v2",
         "pilot",
         "selector-test",
         "smoke",
         "validation"
       ],
-      "drawn_on": "2026-11-02"
+      "drawn_on": "2026-11-15"
     }
+  },
+  "removed_splits": {
+    "names": [
+      "internal",
+      "paper",
+      "paper-v2",
+      "selector-test",
+      "smoke",
+      "validation",
+      "pilot"
+    ],
+    "removed_on": "2026-11-17",
+    "note": "unused by the final battery (the pilot runs of 2026-10-27 read an earlier pilot split); the `disjoint_from` lists still name them, and they stay in git history at 7ed5fd0"
   }
 }

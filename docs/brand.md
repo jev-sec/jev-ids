@@ -1,4 +1,4 @@
-# Jev IDS brand notes
+# JevIDS brand notes
 
 Read from the Figma file "JEV-IDS" (pages Identidade, Logo, Website) on 2026-09-21, in view-only mode. Hex values marked "read" are
 written in the design; values marked "estimated" were judged by eye from the rendered canvas and should be confirmed in Figma.

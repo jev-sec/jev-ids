@@ -55,10 +55,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     runner = commands.add_parser("run", help="run one detector over one split")
     runner.add_argument("--dataset", required=True, type=Path, help="the card: data/<name>/dataset.json")
-    runner.add_argument(
-        "--detector", required=True, help="jev, llm:deepseek, llm:openai, llm:gemini, random_forest, isolation_forest or knn"
-    )
-    runner.add_argument("--split", required=True, help="internal, pilot, smoke, ...")
+    runner.add_argument("--detector", required=True, help="jev, llm:sonnet, random_forest, isolation_forest or knn")
+    runner.add_argument("--split", required=True, help="the split file to judge, such as paper-v3 or validation")
     runner.add_argument(
         "--k",
         type=parse_list,
@@ -67,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     runner.add_argument("--seeds", type=parse_list, default=(0, 1, 2), help="seeds of the example draws")
     runner.add_argument("--reps", type=int, default=1, help="repetitions of each (k, seed) cell")
-    runner.add_argument("--model", help="provider model id, for the LLM detectors")
+    runner.add_argument("--model", help="Anthropic model id, for llm:sonnet")
     runner.add_argument("--results-dir", type=Path, default=run.RESULTS_DIR, help="where the run directory is created")
     runner.add_argument("--delay", type=int, help="stream the split with this feedback delay D, in Flows (docs/jevids-design.md, D4)")
     runner.add_argument("--jobs", type=int, default=-1, help="CPU cores each forest fit may use; -1 for all, the default")
@@ -93,12 +91,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--beta",
         type=float,
         default=BETA,
-        help="the KController's factor on an error under --control aimd (2, as D5 fixed it, outside the sensitivity check)",
+        help="the KController's factor on an error under --control aimd (2, as D5 fixes it)",
     )
     runner.add_argument("--neighbours", help="K of the kNN: a number, or matched:k for as many as the Selector gives Jev at k")
     runner.set_defaults(handler=run_command)
 
-    redoer = commands.add_parser("redo-errors", help="complete a run in place: its error rows again, its missing flows for the first time")
+    redoer = commands.add_parser(
+        "redo-errors", help="complete a run in place: its missing flows, and its error rows again unless it is a stream"
+    )
     redoer.add_argument("run_dir", type=Path, help="results/<run_id> directory")
     redoer.set_defaults(handler=redo_command)
 
@@ -125,7 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
     signer.add_argument("--b", nargs="+", required=True, type=Path, help="results/<run_id> directories of detector B")
     signer.set_defaults(handler=sign_test_command)
 
-    # Giving both paired tests a cut per side, so the full system at its tuned cut can meet a baseline at 0.5 (D9).
+    # Giving both paired tests a cut per side, so Jev alone at its tuned cut can meet a baseline at 0.5 (D9).
     for paired in (comparer, signer):
         paired.add_argument("--threshold-a", type=float, help="take the Verdicts of A again at this cut instead of 0.5 (D9)")
         paired.add_argument("--threshold-b", type=float, help="take the Verdicts of B again at this cut instead of 0.5 (D9)")
@@ -134,12 +134,12 @@ def build_parser() -> argparse.ArgumentParser:
     tuner.add_argument("run_dirs", nargs="+", type=Path, help="results/<run_id> directories of the validation stream")
     tuner.set_defaults(handler=threshold_command)
 
-    fuser = commands.add_parser("fuse", help="the Fusion run of a Stream, from its Jev runs and its matched kNN run")
+    fuser = commands.add_parser("fuse", help="the run of the full JevIDS of a Stream, from its Jev runs and its matched kNN run")
     fuser.add_argument("jev_dirs", nargs="+", type=Path, help="results/<run_id> directories of Jev on the Stream")
     fuser.add_argument("--knn", required=True, type=Path, help="results/<run_id> directory of the matched kNN on the same Stream")
     fuser.add_argument("--calibration-jev", nargs="+", required=True, type=Path, help="Jev's runs of the validation stream")
     fuser.add_argument("--calibration-knn", required=True, type=Path, help="the matched kNN's run of the validation stream")
-    fuser.add_argument("--results-dir", required=True, type=Path, help="where the Fusion run directory is created")
+    fuser.add_argument("--results-dir", required=True, type=Path, help="where the run directory of the full JevIDS is created")
     fuser.set_defaults(handler=fuse_command)
     return parser
 
@@ -210,7 +210,7 @@ def threshold_command(args: argparse.Namespace) -> None:
 
 
 def fuse_command(args: argparse.Namespace) -> None:
-    """`fuse`: the Fusion run of a Stream, its percentiles read on the validation runs given."""
+    """`fuse`: the run of the full JevIDS of a Stream, its percentiles read on the validation runs given."""
     fusion.fuse(args.jev_dirs, args.knn, (args.calibration_jev, args.calibration_knn), args.results_dir)
 
 

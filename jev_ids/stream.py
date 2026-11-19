@@ -1,11 +1,11 @@
-"""Jev IDS as a stream: Flows judged in the order they end, with a memory that grows as their labels come back.
+"""JevIDS as a stream: Flows judged in the order they end, with a memory that grows as their labels come back.
 
 In reading order:
 
 - `in_stream_order`: a split in the order its Flows end.
 - `Memory`: what has happened before a Flow, by Category: the pool Flows that ended before it and the judged Flows whose label came back.
-- `random_examples`: ceil(k_c) Examples of each Category c, drawn at random from the memory for one Flow, for line 0
-  of docs/jevids-design.md and stage 6's ablation without the `Selector`, which replaces it from stage 3 on.
+- `random_examples`: ceil(k_c) Examples of each Category c, drawn at random from the memory for one Flow, for the
+  ablations without the `Selector` (docs/jevids-design.md, D11).
 - `split_names`: the attack name of every row of a split, for `first_contact` only.
 - `stream_cell`: one (k, seed, rep) cell over the stream, one call and one appended row per Flow.
 
@@ -37,8 +37,8 @@ class Predictor(Protocol):
     def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]: ...  # noqa: D102  documented by each Detector
 
 
-# Typing what gives a Flow its Examples at a step, with any extra fields for its row. It is the `Selector` from stage 3 (no extra field),
-# with the `KController` from stage 4 (the k of every Category), and None in `stream_cell` falls back to the random draw of line 0.
+# Typing what gives a Flow its Examples at a step, with any extra fields for its row. It is the `Selector` (no extra field),
+# with the `KController` (the k of every Category), and None in `stream_cell` falls back to the random draw.
 Choose = Callable[["Memory", Flow, int], tuple[list[Flow], dict[str, Any]]]
 
 
@@ -128,6 +128,24 @@ def random_examples(memory: Memory, flow: Flow, step: int, k: Mapping[str, float
     return chosen
 
 
+def resume(memory: Memory, flows: Sequence[Flow], rows: Sequence[Prediction]) -> None:
+    """Put the rows a cell already wrote back into its fresh memory, so `stream_cell` goes on from the first Flow without a row.
+
+    The rows are the cell's whole state. The `KController` rebuilds its k from them at the next step,
+    and the `Selector` keeps none of its own. Error rows stay, because the later Flows saw them in their memory.
+
+    Args:
+        memory: the cell's memory, with nothing judged yet.
+        flows: the split, in any order.
+        rows: the rows the cell wrote, in the order it wrote them.
+    """
+    order = in_stream_order(flows)
+    if [row["row_id"] for row in rows] != [flow.row_id for flow in order[: len(rows)]]:
+        raise ValueError("the stored rows are not the first Flows of the stream, in order: judge the run again from the start")
+    for flow, row in zip(order, rows, strict=False):
+        memory.add(flow, row)
+
+
 def split_names(path: Path) -> dict[int, str]:
     """row_id -> attack name, from the split's `raw_label` trace column; empty when the split has none."""
     with path.open(encoding="utf-8", newline="") as handle:
@@ -154,12 +172,15 @@ def stream_cell(  # noqa: PLR0913, PLR0917  the cell's fields plus the hook that
         flows: the split to judge, in any order.
         cell: the cell's fields, copied into every row. Its `k` is k Examples per Category for Jev, or None for
             a forest, which gets the whole memory and refits on it at every step. A refit every 100 steps was tried
-            first and left the forests days behind on the pilot (docs/jevids-design.md, "Changes after results").
+            first and left the forests days behind (docs/jevids-design.md, D10).
         choose: when given, replaces the random draw for Jev and may add fields to the row.
-            It is the `Selector` (stage 3) and its `KController` (stage 4).
+            The `Selector` and its `KController` provide it.
+
+    A memory that `resume` filled makes the cell go on from its first Flow without a row.
     """
     errors = 0
-    for step, flow in enumerate(in_stream_order(flows)):
+    start = len(memory.judged)
+    for step, flow in enumerate(in_stream_order(flows)[start:], start=start):
         extra: dict[str, Any] = {}
         if choose is not None:
             examples, extra = choose(memory, flow, step)

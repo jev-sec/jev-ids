@@ -1,18 +1,19 @@
-"""The Fusion: Jev and the matched kNN on one Stream, as one Detector (docs/jevids-design.md, "2026-11-17: the Fusion").
+"""The full JevIDS: Jev and the matched kNN on one Stream, as one Detector (docs/jevids-design.md, D12).
 
 In reading order:
 
 - `percentile_in`: where a p_attack falls among the p_attack one Detector gave on the validation stream.
-- `fuse`: the Fusion run, built from a Jev run and a matched kNN run of the same Stream.
+- `fuse`: the run of the full JevIDS, built from a Jev run and a matched kNN run of the same Stream.
 
-Each Flow gets two p_attack, Jev's and the matched kNN's. Each becomes its percentile among that Detector's p_attack on the validation
-stream, ties at the mid rank, so both read on one scale from 0 to 1. The Fusion's p_attack is the plain mean of the two percentiles, and
-its Cut is taken on the fused validation stream by `metrics.best_threshold`, as Jev's is (D9).
+Each Flow gets two p_attack, Jev's and the matched kNN's. Each becomes its percentile among that Detector's p_attack
+on the validation stream, ties at the mid rank, so both read on one scale from 0 to 1. The p_attack of the full JevIDS
+is the plain mean of the two percentiles, and its Cut is taken on the fused validation stream by `metrics.best_threshold`,
+as Jev's is (D9).
 
 Jev and the kNN never read each other's answers. The `Selector` and the `KController` read Jev's own rows, and the kNN reads only the
 Categories of the memory, which come back whatever any Detector said. So one Stream judged twice, once by each Detector, joined by
-`row_id`, gives every row a run of both together would give, and the Fusion is built from the two finished runs at no cost.
-When Jev's call fails, the Fusion falls back on the matched kNN, whose percentile alone is the p_attack. The row keeps Jev's error
+`row_id`, gives every row a run of both together would give, and the full JevIDS is built from the two finished runs at no cost.
+When Jev's call fails, the full JevIDS falls back on the matched kNN, whose percentile alone is the p_attack. The row keeps Jev's error
 as `error_jev` and says `fallback`, so a reader can count these Flows or leave them out.
 """
 
@@ -35,7 +36,7 @@ def percentile_in(values: Sequence[float]) -> Callable[[float], float]:
 
 
 def fuse(jev_dirs: Sequence[Path], knn_dir: Path, calibration: tuple[Sequence[Path], Path], results_dir: Path) -> Path:
-    """Write the Fusion run of a Stream from its Jev runs and its matched kNN run.
+    """Write the run of the full JevIDS of a Stream from its Jev runs and its matched kNN run.
 
     A missing p_attack in an answered row counts as 0. Jev's percentiles come from every answered row of its validation runs, every seed
     together, and the kNN's from every row of its validation run. To fuse the validation stream itself, pass its runs both ways.
@@ -44,10 +45,10 @@ def fuse(jev_dirs: Sequence[Path], knn_dir: Path, calibration: tuple[Sequence[Pa
         jev_dirs: the Jev runs of the Stream, one or more seeds.
         knn_dir: the matched kNN run of the same Stream, deterministic and so judged once.
         calibration: the Jev runs and the matched kNN run of the validation stream.
-        results_dir: where the Fusion run directory is created.
+        results_dir: where the run directory of the full JevIDS is created.
 
     Returns:
-        The Fusion run directory, whose rows copy Jev's with the fused `p_attack` and the two it came from.
+        The run directory of the full JevIDS, whose rows copy Jev's with the fused `p_attack` and the two it came from.
     """
     calibration_jev = [row.get("p_attack") or 0 for path in calibration[0] for row in read_predictions(path) if row.get("error") is None]
     jev_percentile = percentile_in(calibration_jev)

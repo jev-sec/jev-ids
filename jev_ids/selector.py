@@ -1,4 +1,4 @@
-"""The `Selector` of Jev IDS: which Examples of each Category one Flow gets (docs/jevids-design.md, D6).
+"""The `Selector` of JevIDS: which Examples of each Category one Flow gets (docs/jevids-design.md, D6).
 
 In reading order:
 
@@ -17,8 +17,7 @@ from collections.abc import Mapping, Sequence
 
 import numpy as np
 
-from jev_ids.dataset import Flow
-from jev_ids.detectors.random_forest import Encoder, Vocabulary
+from jev_ids.dataset import Encoder, Flow, Vocabulary
 from jev_ids.records import Prediction
 from jev_ids.stream import Memory, end_of
 
@@ -84,12 +83,12 @@ def difficulty(row: Prediction | None) -> float:
 class Selector:
     """Chooses ceil(k_c) Examples of each Category for one Flow, by score and MMR over the memory visible to it.
 
-    With an anchor Category, the nearest candidate of that Category joins its Examples when MMR left it out (the change of 2026-11-02 in
-    docs/jevids-design.md, the benign Category as anchor).
+    With an anchor Category, the nearest candidate of that Category joins its Examples when MMR left it out
+    (docs/jevids-design.md, D6, with the benign Category as anchor).
     """
 
     def __init__(self, space: Space, anchor: str | None = None) -> None:
-        """Keep the space the distances are measured in and the anchor Category, None for the `Selector` of D6 as fixed."""
+        """Keep the space the distances are measured in and the anchor Category, None for the `Selector` without an anchor."""
         self.space = space
         self.anchor = anchor
 

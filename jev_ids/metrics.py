@@ -2,7 +2,7 @@
 
 Helpers first (`verdict`, `at_threshold`, `mean`, `ratio`, `rate`, `only_subset`, `only_k`, `group_by_fields`),
 then the scores of one set of rows (`recall_by_category`, `ranking`, `scores`), the priced usage (`cost_usd_per_1m`,
-`share_used`, `latency`, `usage`), the summary (`summary`, `none_last_key`, `summarize`), the cut of D9 (`best_threshold`)
+`latency`, `usage`), the summary (`summary`, `none_last_key`, `summarize`), the cut of D9 (`best_threshold`)
 and the paired comparisons (`mcnemar_exact`, `holm`, `sign_test`, `compare_cell`, `compare`). F1 is the attack class's,
 not macro. A row without a Verdict counts as `normal` (fail-open) and ranks lowest, and the CLI turns the dicts into CSV.
 """
@@ -90,8 +90,8 @@ def group_by_fields(predictions: Iterable[Prediction], fields: Sequence[str]) ->
 def recall_by_category(attacks: Sequence[Prediction]) -> dict[str, float | None]:
     """Recall over each attack Category present, on all its rows, on its known ones and on its novel ones.
 
-    One F1 hides that the Categories differ in kind: in NSL-KDD, dos and probe leave a statistical trace while r2l and u2r look like
-    normal sessions, so the paper reports `recall_known_<category>` and `recall_novel_<category>` beside it (Table 3).
+    One F1 hides that the Categories differ in kind: a flood leaves a statistical trace while a slow attack looks like
+    benign traffic, so the report gives `recall_known_<category>` and `recall_novel_<category>` beside it.
 
     Args:
         attacks: the attack rows to score.
@@ -161,8 +161,7 @@ def scores(rows: Sequence[Prediction]) -> dict[str, float | None]:
 def cost_usd_per_1m(row: Prediction, prices: dict[str, Any]) -> float | None:
     """List cost in USD of 1M calls like this row: tokens × the per-1M-token prices.
 
-    OpenAI and DeepSeek count reasoning inside `output_tokens`, while Gemini reports it apart in `reasoning_tokens`
-    and bills it as output, so a price entry with `reasoning_outside_output` adds those tokens at the output rate.
+    Both Jev and Claude count any reasoning inside `output_tokens`, so the three rates cover the whole bill.
 
     Args:
         row: one row, with its `model` and the `usage` its call reported.
@@ -177,18 +176,11 @@ def cost_usd_per_1m(row: Prediction, prices: dict[str, Any]) -> float | None:
         return None
     # Taking the cached tokens, which are part of the input and billed at their own rate.
     cached = tokens.get("cache_read_tokens", 0)
-    reasoning = tokens.get("reasoning_tokens", 0) if price.get("reasoning_outside_output") else 0
     return (
         (tokens["input_tokens"] - cached) * price["input"]
         + cached * price["cached_input"]
-        + (tokens.get("output_tokens", 0) + reasoning) * price["output"]
+        + tokens.get("output_tokens", 0) * price["output"]
     )
-
-
-def share_used(usages: Sequence[dict[str, Any]], name: str) -> float | None:
-    """Share of the calls whose usage has a positive `name`; None when no call reports the field."""
-    reported = [usage_of_call[name] for usage_of_call in usages if name in usage_of_call]
-    return ratio(sum(tokens > 0 for tokens in reported), len(usages)) if reported else None
 
 
 def latency(rows: Sequence[Prediction]) -> dict[str, float | None]:
@@ -217,28 +209,20 @@ def latency(rows: Sequence[Prediction]) -> dict[str, float | None]:
 
 
 def usage(rows: Sequence[Prediction], prices: dict[str, Any]) -> dict[str, float | None]:
-    """Mean of every number in the rows' usage, how often Gemini thinks and reads from cache, cost per 1M Flows and latency.
-
-    Gemini thinks and reads from cache on only part of the calls, so the paper reports how often each happens
-    and the reasoning per call that thinks. Detectors without these fields leave the three columns empty.
+    """Mean of every number in the rows' usage, the cost per 1M Flows and the latencies.
 
     Args:
         rows: the rows of one group.
         prices: the per-1M-token prices of each model, the `models` table of prices.json.
 
     Returns:
-        The mean of every numeric usage field, the two shares, the reasoning per thinking call, the cost per 1M Flows and the latencies.
+        The mean of every numeric usage field, the cost per 1M Flows and the latencies.
     """
     usages: list[dict[str, Any]] = [prediction.get("usage", {}) for prediction in rows]
     # Collecting every key that holds a number in at least one row. Detectors report different token fields, so the columns follow the rows.
     counted = sorted({name for usage_of_call in usages for name, value in usage_of_call.items() if isinstance(value, int | float)})
     return {
         **{f"{name}_mean": mean(usage_of_call.get(name) for usage_of_call in usages) for name in counted},
-        "reasoning_share": share_used(usages, "reasoning_tokens"),
-        "reasoning_tokens_when_used_mean": mean(
-            usage_of_call["reasoning_tokens"] for usage_of_call in usages if usage_of_call.get("reasoning_tokens", 0) > 0
-        ),
-        "cache_read_share": share_used(usages, "cache_read_tokens"),
         "cost_usd_per_1m": mean(cost_usd_per_1m(prediction, prices) for prediction in rows),
         **latency(rows),
     }

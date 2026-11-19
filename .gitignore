@@ -5,6 +5,7 @@ __pycache__/
 .complexipy_cache/
 .pytest_cache/
 .coverage
+.coverage.*
 .DS_Store
 data/*
 !data/*/
@@ -12,5 +13,11 @@ data/raw/
 data/*/pool.csv
 data/*/test.csv
 results/**/responses.jsonl
+results/zeroday-*/
+results/sonnet-pilot/
 *.log
 dev-docs/
+mutants/
+.stryker-tmp/
+reports/
+.quality/

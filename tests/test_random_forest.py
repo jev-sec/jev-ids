@@ -2,7 +2,7 @@
 
 import pytest
 
-from jev_ids.dataset import Flow
+from jev_ids.dataset import Encoder, Flow, feature_vector, vocabulary
 from jev_ids.detectors import random_forest as rf
 from jev_ids.run import sample_examples
 from tests.helpers import CONFIG
@@ -23,14 +23,14 @@ TRAIN = [
     flow(4, "probe", "icmp", "8"),
     flow(5, "probe", "udp", "1"),
 ]
-VOCABULARY = rf.vocabulary(TRAIN, CONFIG)
+VOCABULARY = vocabulary(TRAIN, CONFIG)
 
 
 def test_vocabulary_and_vector_shape() -> None:
     assert VOCABULARY == {1: ("icmp", "tcp", "udp")}
     # Placing the two numeric features first, in order, then one column per known value of `b`.
-    assert rf.feature_vector(TRAIN[4], VOCABULARY) == [8.0, 0.0, 1.0, 0.0, 0.0]
-    unseen = rf.feature_vector(flow(99, "normal", "sctp", "1"), VOCABULARY)
+    assert feature_vector(TRAIN[4], VOCABULARY) == [8.0, 0.0, 1.0, 0.0, 0.0]
+    unseen = feature_vector(flow(99, "normal", "sctp", "1"), VOCABULARY)
     assert unseen == [1.0, 0.0, 0.0, 0.0, 0.0]
 
 
@@ -61,9 +61,9 @@ def test_fit_rejects_zero_shot() -> None:
 
 
 def test_the_encoder_encodes_each_flow_once_and_jobs_leave_the_forest_unchanged() -> None:
-    encoder = rf.Encoder(VOCABULARY)
+    encoder = Encoder(VOCABULARY)
     first = encoder.matrix(TRAIN)
-    assert first.tolist() == [rf.feature_vector(flow, VOCABULARY) for flow in TRAIN]
+    assert first.tolist() == [feature_vector(flow, VOCABULARY) for flow in TRAIN]
     # Emptying the vocabulary, so a Flow encoded again would fail on its symbolic value and only the kept rows can answer.
     encoder.vocabulary = {}
     assert encoder.matrix(TRAIN[::-1]).tolist() == first[::-1].tolist()

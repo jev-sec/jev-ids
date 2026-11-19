@@ -1,0 +1,18 @@
+{
+  "source": "data/cicids2017",
+  "seed": 20261115,
+  "held_out": [
+    "DoS Hulk"
+  ],
+  "stream": {
+    "BENIGN": 300,
+    "Botnet": 5,
+    "BruteForce": 43,
+    "DDoS": 191,
+    "DoS": 259,
+    "PortScan": 202
+  },
+  "novel_attack_rows": 150,
+  "pool_rows": 77216,
+  "drawn_on": "2026-11-15"
+}

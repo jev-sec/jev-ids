@@ -11,10 +11,9 @@ import pytest
 
 from jev_ids import records, run, selector, stream
 from jev_ids.controller import KController
-from jev_ids.dataset import Flow
+from jev_ids.dataset import Flow, vocabulary
 from jev_ids.detectors import jev
-from jev_ids.detectors.random_forest import vocabulary
-from tests.helpers import CONFIG, JEV_PROMPT, make_flow
+from tests.helpers import CONFIG, JEV_PROMPT, make_flow, write_dataset
 
 CATEGORIES: list[str] = CONFIG["categories"]
 START = datetime(2017, 7, 3, 12, 0)
@@ -213,3 +212,75 @@ def test_a_choose_hook_replaces_the_random_draw(tmp_path: Path) -> None:
     assert [[example.row_id for example in examples] for _, examples in recorder.calls] == [[], [], [22], [22]]
     assert memory.rows[101]["category_true"] == "normal"
     assert [row["hook"] for row in records.read_predictions(tmp_path)] == [0, 1, 2, 3]
+
+
+class Alarmist(Recorder):
+    """A Detector that calls every Flow a dos attack, so the KController raises the k of the other Categories as their Flows come back."""
+
+    def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]:
+        self.calls.append((flow, list(examples)))
+        return {
+            "p_attack": 1.0,
+            "category_pred": "dos",
+        }
+
+
+def test_a_cell_cut_midway_and_resumed_gives_the_rows_of_one_whole_pass(tmp_path: Path) -> None:
+    # Running Jev alone's chooser (the Selector, the nearest benign Flow and the KController) at D = 2 once whole, and once
+    # cut after 5 steps and resumed from the rows the cut pass wrote. The resumed pass must see the very Examples and k of the whole one.
+    space = selector.Space(vocabulary(POOL, CONFIG), POOL)
+    cell = {
+        "k": 1,
+        "seed": 0,
+        "repetition": 0,
+        "delay": 2,
+    }
+
+    def one_pass(folder: Path, rows: Sequence[records.Prediction] = ()) -> tuple[Alarmist, list[records.Prediction]]:
+        detector = Alarmist()
+        memory = stream.Memory(POOL, CATEGORIES, 2, NAMES)
+        stream.resume(memory, POOL, rows)
+        chooser = run.choose_with(selector.Selector(space, CONFIG["benign"]), 1, CATEGORIES, controller=KController(CATEGORIES))
+        stream.stream_cell(folder, detector, memory, POOL, cell, chooser)
+        return detector, records.read_predictions(folder)
+
+    whole, whole_rows = one_pass(tmp_path / "whole")
+    resumed, resumed_rows = one_pass(tmp_path / "resumed", whole_rows[:5])
+
+    def examples_of(detector: Alarmist) -> list[tuple[int, list[int]]]:
+        return [(flow.row_id, [example.row_id for example in examples]) for flow, examples in detector.calls]
+
+    assert examples_of(resumed) == examples_of(whole)[5:]
+    fields = ("row_id", "step", "n_examples", "k_by_category", "p_attack")
+    assert [[row[field] for field in fields] for row in resumed_rows] == [[row[field] for field in fields] for row in whole_rows[5:]]
+    # Making sure the cut fell after the KController had moved, so the test checks that its k is rebuilt.
+    assert whole_rows[5]["k_by_category"] != whole_rows[0]["k_by_category"]
+    # Refusing rows that are not the first Flows of the stream, in order.
+    with pytest.raises(ValueError, match="not the first"):
+        stream.resume(stream.Memory(POOL, CATEGORIES, 2), POOL, whole_rows[1:3])
+
+
+def test_redo_errors_resumes_an_interrupted_stream_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # Running the Random Forest over the stream, which `redo_errors` builds again from config.json without any network.
+    card = write_dataset(
+        tmp_path / "data",
+        CONFIG,
+        {
+            "pool": POOL,
+            "smoke": FLOWS,
+        },
+    )
+    spec = run.RunSpec(
+        detector="random_forest", dataset=card, split="smoke", k_values=(None,), seeds=(0,), results_dir=tmp_path / "results", delay=2
+    )
+    run_dir = run.run_from_spec(spec)
+    whole = records.read_predictions(run_dir)
+    # Cutting the run after its first two Flows, as a computer turned off midway would leave it.
+    (run_dir / "predictions.jsonl").write_text("".join(json.dumps(row) + "\n" for row in whole[:2]), encoding="utf-8")
+
+    assert run.redo_errors(run_dir) == run_dir
+
+    after = records.read_predictions(run_dir)
+    fields = ("row_id", "step", "delay", "n_examples", "p_attack")
+    assert [[row[field] for field in fields] for row in after] == [[row[field] for field in fields] for row in whole]
+    assert capsys.readouterr().out.splitlines()[-1] == f"redone: 0 error rows and 2 missing flows of {run_dir}"

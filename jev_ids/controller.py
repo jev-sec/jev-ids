@@ -1,4 +1,4 @@
-"""The `KController` of Jev IDS: how many Examples each Category gets, by mirrored AIMD (docs/jevids-design.md, D5).
+"""The `KController` of JevIDS: how many Examples each Category gets, by mirrored AIMD (docs/jevids-design.md, D5).
 
 In reading order:
 
@@ -24,7 +24,7 @@ Pick = Callable[[Memory, Flow, int, Mapping[str, float]], list[Flow]]
 K_START = 1.0
 K_MIN = 1.0
 K_MAX = 8.0
-# Setting D5's multiplicative increase on error, varied over 1.5, 2 and 3 in stage 6's sensitivity check only.
+# Setting D5's multiplicative increase on error, which `--beta` may change for a sensitivity check.
 BETA = 2.0
 # Setting D5's additive decrease on success, spread over a window of k_c successes.
 ALPHA = 1.0

@@ -1,0 +1,25 @@
+{
+  "source": "data/trustlab",
+  "seed": 20261116,
+  "held_out": [
+    "DNS",
+    "Exploitation",
+    "TLSSSL"
+  ],
+  "stream": {
+    "API": 78,
+    "BENIGN": 300,
+    "Bruteforce": 78,
+    "BufferOverflow": 80,
+    "DNS": 50,
+    "Evasion": 90,
+    "Exfiltration": 71,
+    "Exploitation": 50,
+    "PortScan": 79,
+    "Slowloris": 74,
+    "TLSSSL": 50
+  },
+  "novel_attack_rows": 150,
+  "pool_rows": 119150,
+  "drawn_on": "2026-11-16"
+}

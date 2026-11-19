@@ -11,7 +11,7 @@ from jev_ids.detectors import jev
 from jev_ids.run import sample_examples
 from tests.helpers import CONFIG, JEV_PROMPT, make_flow, make_train, no_sleep
 
-# Copying the answer shape of docs.typesafe.ai/api (read on 2026-09-21) with the numbers of a pilot row (warezmaster, 2026-09-20).
+# Copying the answer shape of docs.typesafe.ai/api (read on 2026-09-21) with the numbers of a real answer.
 BODY: dict[str, Any] = {
     "model": "jev-1.13.0",
     "answers": {
@@ -21,10 +21,10 @@ BODY: dict[str, Any] = {
         },
         "category": {
             "type": "choice",
-            "choice": "r2l",
+            "choice": "botnet",
             "confidence": 0.8,
             "probabilities": {
-                "r2l": 0.84,
+                "botnet": 0.84,
                 "probe": 0.02,
                 "normal": 0.14,
             },
@@ -35,7 +35,7 @@ BODY: dict[str, Any] = {
         "output_tokens": 79,
     },
 }
-FLOW = make_flow(9, "r2l", value="1")
+FLOW = make_flow(9, "botnet", value="1")
 TRAIN = make_train(["normal", "dos", "probe"])
 
 
@@ -110,7 +110,7 @@ def test_predict_sends_the_body_as_is_and_reads_the_answer_and_the_version(detec
     assert sent == [jev.request_body(detector.template, FLOW, [])]
     assert prediction["p_attack"] == 0.78
     assert prediction["model"] == "jev-1.13.0"
-    assert prediction["category_pred"] == "r2l"
+    assert prediction["category_pred"] == "botnet"
     assert prediction["confidence"] == 0.8
     assert prediction["usage"] == {
         "input_tokens": 1606,

@@ -31,7 +31,6 @@ from typing import Any
 from jev_ids import ROOT, dataset
 from jev_ids.controller import BETA, Controlled, KController
 from jev_ids.dataset import Config, Flow
-from jev_ids.detectors import random_forest
 from jev_ids.detectors.isolation_forest import IsolationForestDetector
 from jev_ids.detectors.jev import JevDetector
 from jev_ids.detectors.knn import KNNDetector
@@ -39,10 +38,10 @@ from jev_ids.detectors.llm import LLMDetector
 from jev_ids.detectors.random_forest import RandomForestDetector
 from jev_ids.records import append_prediction, complete_prediction, read_predictions, write_config
 from jev_ids.selector import Selector, Space
-from jev_ids.stream import Choose, Memory, random_examples, split_names, stream_cell
+from jev_ids.stream import Choose, Memory, random_examples, resume, split_names, stream_cell
 
 RESULTS_DIR = ROOT / "results"
-# Naming the selections, the two that run the `Selector` last. `score+nearest` adds the nearest benign Flow (2026-11-02).
+# Naming the selections, the two that run the `Selector` last. `score+nearest` adds the nearest benign Flow (D6).
 SELECTIONS = ("random", "score", "score+nearest")
 SCORED = SELECTIONS[1:]
 CONTROLS = ("fixed", "aimd")
@@ -59,27 +58,27 @@ class RunSpec:
     """Everything the CLI resolved for one run; a parameter bundle, nothing more.
 
     Attributes:
-        detector: `jev`, `llm:deepseek`, `llm:openai`, `llm:gemini`, `random_forest` or `isolation_forest`.
+        detector: `jev`, `llm:sonnet`, `random_forest`, `isolation_forest` or `knn`.
         dataset: the card of the dataset, `data/<name>/dataset.json`.
         split: the split to judge, a file under `data/<name>/splits/`.
         k_values: Examples per Category to try; None means the whole pool (the forests).
         seeds: the seeds of the Example draws.
         reps: how often each (k, seed) cell is repeated, for stability.
-        model_id: the provider model, for the LLM detectors; None means default.
+        model_id: the Anthropic model, for `llm:sonnet`, or None for its default.
         results_dir: where run directories are created.
         jobs: CPU cores each forest fit may use (-1 for all).
             The forests come out the same for any value, so it is not part of the experiment.
         delay: the feedback delay D in steps for a stream run (docs/jevids-design.md, D4).
-            None judges every Flow against one fixed draw of Examples, the protocol of the first paper.
+            None judges every Flow against one fixed draw of Examples, with no stream.
         record: how Jev and the LLMs read a Flow's values, `full` or `compact`
             (`dataset.RECORDS`, docs/jevids-design.md, D7). The forests always read them in full.
-        selection: how a stream gives Jev and the LLMs their Examples, `random` (line 0), `score` (the `Selector`, D6) or
-            `score+nearest` (the `Selector` plus the nearest benign Flow, 2026-11-02). None means `score` for a stream
-            and `random` otherwise, the only choice the protocol of the first paper has.
+        selection: how a stream gives Jev and the LLMs their Examples, `random`, `score` (the `Selector`, D6) or
+            `score+nearest` (the `Selector` plus the nearest benign Flow, D6). None means `score` for a stream
+            and `random` otherwise, the only choice a run with no stream has.
         neighbours: K of the kNN, a number or `matched:k` (`knn.parse_neighbours`); None for every other Detector.
         control: `fixed`, the same k for every Category and step, or `aimd`, the `KController` (D5), where k is the starting k₀ = 1 and
-            the `Selector` gives the Examples, or a random draw under `random` (stage 6's ablation without the `Selector`).
-        beta: the `KController`'s factor on an error under `aimd`, 2 as D5 fixed it, varied in stage 6's sensitivity check only.
+            the `Selector` gives the Examples, or a random draw under `random` (the ablation without the `Selector`, D11).
+        beta: the `KController`'s factor on an error under `aimd`, 2 as D5 fixes it.
     """
 
     detector: str
@@ -123,19 +122,18 @@ def build_detector(spec: RunSpec, config: Config) -> Detector:
     prompts = ROOT / "prompts" / config["name"]
     if spec.detector == "jev":
         return JevDetector(load_prompt(prompts / "jev.json"), spec.record)
-    if spec.detector in ("llm:deepseek", "llm:openai", "llm:gemini"):
-        provider = spec.detector.removeprefix("llm:")
-        return LLMDetector(load_prompt(prompts / "llm.md"), provider, spec.model_id, spec.record)
+    if spec.detector == LLMDetector.name:
+        return LLMDetector(load_prompt(prompts / "llm.md"), spec.model_id, spec.record)
     if spec.detector in ("random_forest", "isolation_forest"):
         # Taking the one-hot vocabulary from the whole pool, never from the Examples. Both forests encode a Flow the same way.
         pool = dataset.load_split(config["dir"] / "pool.csv", config)
         forest = RandomForestDetector if spec.detector == "random_forest" else IsolationForestDetector
-        return forest(random_forest.vocabulary(pool, config), config["benign"], spec.jobs)
+        return forest(dataset.vocabulary(pool, config), config["benign"], spec.jobs)
     if spec.detector == "knn":
         if spec.neighbours is None:
             raise ValueError("the kNN needs --neighbours: a number, or matched:k")
         pool = dataset.load_split(config["dir"] / "pool.csv", config)
-        return KNNDetector(Space(random_forest.vocabulary(pool, config), pool), config["benign"], spec.neighbours)
+        return KNNDetector(Space(dataset.vocabulary(pool, config), pool), config["benign"], spec.neighbours)
     raise NotImplementedError(f"detector {spec.detector!r} is not implemented")
 
 
@@ -221,7 +219,7 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
     """
     check_spec(spec, detector.name)
     # Naming the directory under `results/` as `<UTC timestamp>-<dataset>-<detector>-<split>`. Its timestamp keeps its microseconds,
-    # so that runs launched together (one k each, in parallel) never share a directory. The colon of `llm:openai` is not a path character.
+    # so that runs launched together (one k each, in parallel) never share a directory. The colon of `llm:sonnet` is not a path character.
     started = datetime.now(UTC)
     run_id = f"{started:%Y%m%dT%H%M%S.%fZ}-{spec.dataset.parent.name}-{spec.detector.replace(':', '-')}-{spec.split}"
     run_dir = spec.results_dir / run_id
@@ -251,20 +249,7 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
             "started_at": started.isoformat(timespec="seconds"),
         },
     )
-    # Gathering the fields every row of this run shares, to which a cell adds k, seed, rep and the number of Examples.
-    # `record` is in every row because the prompt hash does not change with it. The same template is filled with full or compact values.
-    run_fields: dict[str, Any] = {
-        "run_id": run_id,
-        "dataset": config["name"],
-        "detector": detector.name,
-        "model": detector.model,
-        "split": spec.split,
-        "prompt_hash": detector.prompt_hash,
-        "record": detector.record,
-        "selection": selection_of(spec, detector.name),
-        "control": spec.control if spec.detector not in WHOLE_MEMORY else None,
-        "beta": spec.beta if spec.control == "aimd" else None,
-    }
+    run_fields = shared_fields(spec, detector, config, run_id)
     if spec.delay is not None:
         execute_stream(spec, detector, config, (flows, train), run_fields)
         print(f"done: {run_dir}")
@@ -291,6 +276,25 @@ def execute(spec: RunSpec, detector: Detector, config: Config, flows: Sequence[F
     return run_dir
 
 
+def shared_fields(spec: RunSpec, detector: Detector, config: Config, run_id: str) -> dict[str, Any]:
+    """The fields every row of a run shares, to which a cell adds k, seed, rep and the number of Examples.
+
+    `record` is in every row because the prompt hash does not change with it. The same template is filled with full or compact values.
+    """
+    return {
+        "run_id": run_id,
+        "dataset": config["name"],
+        "detector": detector.name,
+        "model": detector.model,
+        "split": spec.split,
+        "prompt_hash": detector.prompt_hash,
+        "record": detector.record,
+        "selection": selection_of(spec, detector.name),
+        "control": spec.control if spec.detector not in WHOLE_MEMORY else None,
+        "beta": spec.beta if spec.control == "aimd" else None,
+    }
+
+
 def execute_stream(
     spec: RunSpec,
     detector: Detector,
@@ -302,6 +306,8 @@ def execute_stream(
 
     With the `score` selection the `Selector` gives every Category ceil(k) Examples.
     Its space is built once for the run, because it only depends on the pool.
+    A cell that already has rows in the run directory, left by an interrupted run,
+    goes on from its first Flow without a row (`resume`). A new run has none.
 
     Args:
         spec: the resolved run, with a delay.
@@ -312,15 +318,17 @@ def execute_stream(
     """
     flows, train = data
     run_dir = spec.results_dir / run_fields["run_id"]
+    done = read_predictions(run_dir)
     assert spec.delay is not None  # noqa: S101  execute only streams with a delay
     names = split_names(config["dir"] / "splits" / f"{spec.split}.csv")
     selection = run_fields["selection"]
     anchor = config["benign"] if selection == "score+nearest" else None
-    selector = Selector(Space(random_forest.vocabulary(train, config), train), anchor) if selection in SCORED else None
+    selector = Selector(Space(dataset.vocabulary(train, config), train), anchor) if selection in SCORED else None
     for k, seed, repetition in itertools.product(spec.k_values, spec.seeds, range(spec.reps)):
         # Giving each cell a fresh memory and a fresh controller, so what one cell learned never leaks into the next.
         memory = Memory(train, config["categories"], spec.delay, names)
         controller = KController(config["categories"], spec.beta) if spec.control == "aimd" else None
+        resume(memory, flows, [row for row in done if (row["k"], row["seed"], row["repetition"]) == (k, seed, repetition)])
         cell = {
             **run_fields,
             "k": k,
@@ -336,8 +344,8 @@ def choose_with(
 ) -> Choose | None:
     """The hook `stream_cell` calls for the Examples, either the `Selector` at k per Category or the cell's `KController` under `aimd`.
 
-    With a controller and no `Selector`, the ablation of stage 6, the controller's k is drawn at random with the cell's seed.
-    None keeps the stream's own random draw (line 0) or the whole memory (the forests and the kNN).
+    With a controller and no `Selector`, the ablation of D11, the controller's k is drawn at random with the cell's seed.
+    None keeps the stream's own random draw or the whole memory (the forests and the kNN).
 
     Args:
         selector: the run's `Selector`, or None without the `score` selection.
@@ -384,6 +392,8 @@ def redo_errors(run_dir: Path) -> Path:
     Then every (k, seed, rep) cell of the spec is walked as `execute` walks it, with the very Examples of the original draw,
     and the Flows of the split without a kept row in that cell are judged and appended, error or not, so a second pass can follow a first.
     The walk covers a run interrupted midway (a cell half done, cells never started) as much as one finished with quota errors.
+    A stream run keeps every row, error rows included, because each later Flow saw them in its memory, and goes on
+    from the first Flow of each cell without a row, with the memory and the k the stored rows rebuild (`resume`).
     The detector must still be the same model on the same prompt, or the rows would mix two experiments under one `run_id`.
     `responses.jsonl` keeps the raw answers of the failed calls, and `config.json` gains a `redone` entry per pass.
 
@@ -395,10 +405,6 @@ def redo_errors(run_dir: Path) -> Path:
     """
     stored = json.loads((run_dir / "config.json").read_text("utf-8"))
     fields: dict[str, Any] = stored["spec"]
-    if fields.get("delay") is not None:
-        # Refusing a stream run, because its memory depends on every earlier row,
-        # so a Flow judged again would see another past than its neighbours did.
-        raise ValueError(f"{run_dir.name} is a stream run: judge it again from the start instead")
     spec = RunSpec(
         detector=fields["detector"],
         dataset=Path(fields["dataset"]),
@@ -407,12 +413,14 @@ def redo_errors(run_dir: Path) -> Path:
         seeds=tuple(fields["seeds"]),
         reps=fields["reps"],
         model_id=fields["model_id"],
-        results_dir=Path(fields["results_dir"]),
+        results_dir=run_dir.parent,
         # Defaulting to `full`, because a run made before the compact record existed read the values in full.
         record=fields.get("record", "full"),
         selection=fields.get("selection"),
         neighbours=fields.get("neighbours"),
         control=fields.get("control", "fixed"),
+        delay=fields.get("delay"),
+        beta=fields.get("beta", BETA),
     )
     config = dataset.load_config(spec.dataset)
     flows = dataset.load_split(config["dir"] / "splits" / f"{spec.split}.csv", config)
@@ -423,12 +431,13 @@ def redo_errors(run_dir: Path) -> Path:
         prompt = (stored["prompt_hash"] or "none")[:8]
         raise ValueError(f"{run_dir.name} was run with {stored['model']} on prompt {prompt}, and the code now gives another")
     rows = read_predictions(run_dir)
+    run_fields = shared_fields(spec, detector, config, stored["run_id"])
+    if spec.delay is not None:
+        execute_stream(spec, detector, config, (flows, train), run_fields)
+        cells = len(spec.k_values) * len(spec.seeds) * spec.reps
+        return record_redone(run_dir, stored, 0, cells * len(flows) - len(rows))
     kept = [row for row in rows if row.get("error") is None]
     (run_dir / "predictions.jsonl").write_text("".join(json.dumps(row) + "\n" for row in kept), encoding="utf-8")
-    run_fields = {key: stored[key] for key in ("run_id", "detector", "model", "prompt_hash")} | {
-        "dataset": config["name"],
-        "split": spec.split,
-    }
     # Marking a Flow done when its cell holds a kept row for it. Everything else in the cell (an error row or no row at all) is judged now.
     done = {(row["k"], row["seed"], row["repetition"], row["row_id"]) for row in kept}
     judged = 0
@@ -447,12 +456,17 @@ def redo_errors(run_dir: Path) -> Path:
         if todo:
             judge(run_dir, detector, todo, examples, cell)
     errors = len(rows) - len(kept)
+    return record_redone(run_dir, stored, errors, judged - errors)
+
+
+def record_redone(run_dir: Path, stored: dict[str, Any], error_rows: int, missing_flows: int) -> Path:
+    """Add a `redone` entry to the run's `config.json`, print it and give back the run directory."""
     redone = {
         "at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "error_rows": errors,
-        "missing_flows": judged - errors,
+        "error_rows": error_rows,
+        "missing_flows": missing_flows,
     }
     stored["redone"] = [*stored.get("redone", []), redone]
     write_config(run_dir, stored)
-    print(f"redone: {redone['error_rows']} error rows and {redone['missing_flows']} missing flows of {run_dir}")
+    print(f"redone: {error_rows} error rows and {missing_flows} missing flows of {run_dir}")
     return run_dir

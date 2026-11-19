@@ -30,7 +30,7 @@ API_KEY_VAR = "TYPESAFE_API_KEY"
 # Allowing five attempts with exponential backoff on rate limits (429), overload (529), server errors and network failures. Any other 4xx
 # fails at once. A failure ends as a row with `error`, never as an exception, so the run continues. The SDK's own retries stay off, because
 # a retry it made silently would hide inside `latency_ms` and escape `retries`. The run measures the successful attempt alone and counts the
-# failed ones. The runs up to 2026-09-21 went through the Vercel AI Gateway, which rate-limited 1,350 of the 1,800 pilot rows at least once.
+# failed ones.
 MAX_ATTEMPTS = 5
 BACKOFF_SECONDS = 1.0
 TIMEOUT_SECONDS = 60

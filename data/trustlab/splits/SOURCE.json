@@ -1,0 +1,145 @@
+{
+  "sizes": {
+    "paper": 2000
+  },
+  "novel_attack_rows": {
+    "paper": 403
+  },
+  "dataset": "TRUSTLab, Cano Ba\u00f1os and Villafranca Albaladejo, Frontiers in Computer Science, 2026",
+  "flow_meter": "CICFlowMeter 4.0, as published",
+  "seed": 20261116,
+  "caps": {
+    "pool": {
+      "benign": 50000,
+      "attack": 10000
+    },
+    "test": {
+      "benign": 10000,
+      "attack": 1000
+    }
+  },
+  "novel_labels": [
+    "C2Beaconing",
+    "DDoS",
+    "DoS",
+    "MITM",
+    "WebBased"
+  ],
+  "novel_draw": {
+    "seed": 20261116,
+    "count": 4,
+    "twins": [
+      "DDoS",
+      "DoS"
+    ]
+  },
+  "dropped_rows": {},
+  "days": {
+    "API": [
+      "2025-06-24",
+      "2025-06-24"
+    ],
+    "BENIGN": [
+      "2025-05-24",
+      "2025-06-28"
+    ],
+    "Bruteforce": [
+      "2025-06-29",
+      "2025-06-30"
+    ],
+    "BufferOverflow": [
+      "2025-06-25",
+      "2025-06-25"
+    ],
+    "C2Beaconing": [
+      "2025-06-26",
+      "2025-06-26"
+    ],
+    "DDoS": [
+      "2025-05-24",
+      "2025-05-24"
+    ],
+    "DNS": [
+      "2025-06-25",
+      "2025-06-25"
+    ],
+    "DoS": [
+      "2025-06-01",
+      "2025-06-01"
+    ],
+    "Evasion": [
+      "2025-06-25",
+      "2025-06-25"
+    ],
+    "Exfiltration": [
+      "2025-06-27",
+      "2025-06-27"
+    ],
+    "Exploitation": [
+      "2025-06-25",
+      "2025-06-25"
+    ],
+    "MITM": [
+      "2025-06-25",
+      "2025-06-25"
+    ],
+    "PortScan": [
+      "2025-05-24",
+      "2025-05-24"
+    ],
+    "Slowloris": [
+      "2025-06-01",
+      "2025-06-01"
+    ],
+    "TLSSSL": [
+      "2025-06-26",
+      "2025-06-26"
+    ],
+    "WebBased": [
+      "2025-05-24",
+      "2025-06-30"
+    ]
+  },
+  "rows_by_label": {
+    "pool": {
+      "API": 10000,
+      "BENIGN": 50000,
+      "Bruteforce": 10000,
+      "BufferOverflow": 10000,
+      "DNS": 10000,
+      "Evasion": 10000,
+      "Exfiltration": 10000,
+      "Exploitation": 10000,
+      "PortScan": 10000,
+      "Slowloris": 10000,
+      "TLSSSL": 10000
+    },
+    "test": {
+      "API": 1000,
+      "BENIGN": 10000,
+      "Bruteforce": 1000,
+      "BufferOverflow": 1000,
+      "C2Beaconing": 1000,
+      "DDoS": 1000,
+      "DNS": 1000,
+      "DoS": 1000,
+      "Evasion": 1000,
+      "Exfiltration": 1000,
+      "Exploitation": 1000,
+      "MITM": 1000,
+      "PortScan": 1000,
+      "Slowloris": 1000,
+      "TLSSSL": 1000,
+      "WebBased": 1000
+    }
+  },
+  "prepared_on": "2026-11-16",
+  "draws": {
+    "paper": {
+      "seed": 20261116,
+      "source": "test.csv",
+      "disjoint_from": [],
+      "drawn_on": "2026-11-16"
+    }
+  }
+}

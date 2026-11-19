@@ -1,4 +1,4 @@
-"""Detectors: Jev, the two LLM baselines, the Random Forest and the Isolation Forest.
+"""Detectors: Jev, the Sonnet baseline, the Random Forest, the Isolation Forest and the kNN.
 
 Each detector is a class with `name`, `model`, `prompt_hash` and `predict(flow, examples) -> dict` returning what it measured for that
 one Flow (`p_attack`, `category_pred`, `latency_ms`, ...) or an `error`. The run loop treats them alike without a shared base class.

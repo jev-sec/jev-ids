@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320"
      role="img" aria-labelledby="banner-title">
-  <title id="banner-title">Jev IDS: intrusion detection with a System One Model, on a stream of flows whose labels come back late.</title>
+  <title id="banner-title">JevIDS: intrusion detection with a System One Model, on a stream of flows whose labels come back late.</title>
 
   <defs>
     <style>

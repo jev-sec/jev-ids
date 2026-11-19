@@ -6,6 +6,7 @@ In reading order:
 - `load_config`: the card `dataset.json` as a dict, hashed.
 - `flow_from_row` and `load_split`: a CSV in the shared shape as Flows.
 - `record_text` and `compact_value`: a Flow's values as the text a model reads, in full or compact (docs/jevids-design.md, D7).
+- `vocabulary`, `feature_vector` and `Encoder`: a Flow as numbers, its symbolic values one-hot, for the forests and the `Space`.
 - `category_by_name`, `split_header` and `write_split`: the card's label table and the same shape, for the preparation scripts.
 
 A dataset lives in `data/<name>/`: `dataset.json` (the card), `pool.csv` (the Flows that Examples are drawn from) and `splits/<split>.csv`
@@ -30,6 +31,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 # Typing the dataset card as a dict, the shape `load_config` returns.
 Config = dict[str, Any]
 
@@ -46,7 +49,7 @@ class Flow:
         category: the Category label; an attack name never gets this far.
         is_attack: whether the category is not the card's benign one.
         novel_attack: whether the attack is absent from the pool (CONTEXT.md).
-        end: when the Flow ended, the moment its record exists; None for a dataset without timestamps, such as NSL-KDD.
+        end: when the Flow ended, the moment its record exists; None for a dataset without timestamps.
     """
 
     row_id: int
@@ -133,7 +136,7 @@ def compact_value(value: str) -> str:
 
     An integer stays as it is, whatever its length, because a port such as `44321` is a name more than a size and
     rounding `20694308` to `20690000` would not shorten it. A value that is not a finite number
-    (NSL-KDD's `tcp`, `inf`, `nan`) stays as it is too. A decimal with an integer value loses its `.0`, so `0.0` becomes `0`.
+    (`tcp`, `inf`, `nan`) stays as it is too. A decimal with an integer value loses its `.0`, so `0.0` becomes `0`.
 
     Args:
         value: one feature value, as the CSV has it.
@@ -150,6 +153,76 @@ def compact_value(value: str) -> str:
     if not math.isfinite(number):
         return value
     return format(Decimal(f"{number:.{SIGNIFICANT_DIGITS}g}"), "f")
+
+
+# Mapping a feature index to the sorted values it takes in the pool, one entry per symbolic feature, in card order.
+Vocabulary = dict[int, tuple[str, ...]]
+
+
+def vocabulary(flows: Sequence[Flow], config: Config) -> Vocabulary:
+    """The sorted values of each symbolic feature of the card, by feature index.
+
+    Taken from the whole pool and not from the Examples of a cell,
+    so that every cell of a run encodes a Flow the same way whatever k was drawn.
+
+    Args:
+        flows: the pool.
+        config: the dataset card, which names the features and the symbolic ones.
+
+    Returns:
+        A `Vocabulary`, mapping each symbolic feature index to its sorted values.
+    """
+    indexes: list[int] = [config["features"].index(name) for name in config["symbolic"]]
+    seen: dict[int, set[str]] = {index: set() for index in indexes}
+    for flow in flows:
+        values = flow.attribute_values
+        for index in indexes:
+            seen[index].add(values[index])
+    return {index: tuple(sorted(seen[index])) for index in indexes}
+
+
+def feature_vector(flow: Flow, vocabulary: Vocabulary) -> list[float]:
+    """The numeric features as floats, in order, then the symbolic ones one-hot.
+
+    A symbolic value absent from the pool becomes all zeros, the equivalent of
+    scikit-learn's `handle_unknown="ignore"`, so a split Flow never breaks the forest.
+
+    Args:
+        flow: the Flow to encode.
+        vocabulary: the symbolic values of the pool (see `vocabulary`).
+
+    Returns:
+        The Flow as one row of floats.
+    """
+    values = flow.attribute_values
+    numeric = [float(value) for index, value in enumerate(values) if index not in vocabulary]
+    one_hot: list[float] = []
+    for index, known_values in vocabulary.items():
+        one_hot.extend(float(known == values[index]) for known in known_values)
+    return numeric + one_hot
+
+
+class Encoder:
+    """Flows as the rows of a matrix, each Flow encoded once and kept.
+
+    A stream refits the forests at every step on nearly the same memory, up to about 90,000 Flows; encoding them all again took about 2 s
+    a step, longer than many of the fits. Flows are frozen, so a Flow is its own key.
+    """
+
+    def __init__(self, vocabulary: Vocabulary) -> None:
+        """Keep the vocabulary; no Flow is encoded yet."""
+        self.vocabulary = vocabulary
+        self._rows: dict[Flow, np.ndarray] = {}
+
+    def matrix(self, flows: Sequence[Flow]) -> np.ndarray:
+        """The Flows as one row each, in order."""
+        rows: list[np.ndarray] = []
+        for flow in flows:
+            row = self._rows.get(flow)
+            if row is None:
+                row = self._rows[flow] = np.asarray(feature_vector(flow, self.vocabulary), dtype=float)
+            rows.append(row)
+        return np.vstack(rows)
 
 
 def category_by_name(config: Config) -> dict[str, str]:

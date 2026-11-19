@@ -1,14 +1,12 @@
 """Convert the improved CIC-IDS2017 into the shared CSV shape of `data/cicids2017/`.
 
 Run once, from the repository root, after downloading `CICIDS2017_improved.zip` from
-https://intrusion-detection.distrinet-research.be/CNS2022/Dataset_Download.html into `data/raw/cicids2017/`, then draw the splits:
+https://intrusion-detection.distrinet-research.be/CNS2022/Dataset_Download.html into `data/raw/cicids2017/`:
 
     uv run python -m scripts.prepare_cicids2017
-    uv run python -m scripts.draw_split --dataset data/cicids2017 --name smoke --size 5 --seed 20261027
-    uv run python -m scripts.draw_split --dataset data/cicids2017 --name internal --size 50 --seed 20261027
-    uv run python -m scripts.draw_split --dataset data/cicids2017 --name pilot --size 300 --seed 20261027
-    uv run python -m scripts.draw_split --dataset data/cicids2017 --name paper --size 2000 --seed 20261027 --min-novel 250
-    uv run python -m scripts.draw_split --dataset data/cicids2017 --name validation --size 300 --seed 20261027 --source pool.csv
+
+The test split `splits/paper-v3.csv` is kept as a file. It was drawn with `draw_split --name paper-v3 --size 2000 --seed 20261115
+--min-novel 250` while seven earlier splits were on disk, so the same command on a fresh folder draws other rows.
 
 The zip is the relabelled CIC-IDS2017 of Liu et al., "Error Prevalence in NIDS datasets: A Case Study on CIC-IDS-2017
 and CSE-CIC-IDS-2018", IEEE CNS 2022, pp. 254-262, with one CSV per weekday of the capture (3 to 7 July 2017) and 91 columns.
@@ -20,18 +18,19 @@ Five decisions turn it into a Pool and a test file:
    a start-up artefact, an unresponsive target). Such a flow is neither an attack nor plainly benign, so it is dropped. Heartbleed
    (11 flows), the three web attacks (104) and Infiltration (36) are dropped too, because they have too few flows for any
    per-Category metric. Every other label gets its Category from the card's `attack_names`, and a label the card does not know raises.
-2. Columns. The card keeps 83 of the 91 columns. It leaves out the flow id, both addresses,
-   the ephemeral source port and the timestamp, which name the testbed and not the behaviour,
-   so a Detector could learn them instead of the traffic. `id`, `Timestamp` and `Label` survive as trace columns.
+2. Columns. The card keeps 78 of the 91 columns. It leaves out the flow id, both addresses, the ephemeral source port,
+   the timestamp and five columns of the sender's TCP stack, which name the testbed and its hosts and not the behaviour,
+   so a Detector could learn them instead of the traffic (docs/jevids-design.md, D7).
+   `id`, `Timestamp` and `Label` survive as trace columns.
 3. Pool and test in time, per day. The flows of each label on each day are sorted by timestamp. The earlier half may become
    Examples and the later half may be judged. An Example is therefore never later than a judged Flow of the same attack on the
    same day, near-identical flows of one burst stay on one side, and BENIGN, the only label spanning several days, is judged on
    every day it occurs instead of only from Wednesday afternoon on (docs/jevids-design.md, D2).
 4. Novel attacks. The labels in `NOVEL_LABELS` never reach the Pool, and all their flows are
    test candidates with `novel_attack` = 1. Each holds out one variant of a Category that keeps
-   another variant in the Pool, as NSL-KDD's test-only attack names do (CONTEXT.md, "Novel attack").
+   another variant in the Pool (CONTEXT.md, "Novel attack").
 5. Caps. A seeded sample of at most `POOL_CAPS` (pool.csv) and `TEST_CAPS` (test.csv) flows per label,
-   so no attack variant and no benign flood dominates, and the Pool stays near the size of NSL-KDD's.
+   so no attack variant and no benign flood dominates.
 
 `end`, the timestamp plus the Flow Duration in microseconds, is when the flow's record exists, and it orders the stream (D3). `row_id`
 is the 0-based index of a flow over the five files read Monday to Friday, because each file's own `id` restarts at 1. The trace
@@ -128,7 +127,7 @@ def halves(flows: list[tuple[str, str, int]], novel: bool) -> tuple[list[int], l
     """The row_ids that may go to the pool and to the test: the earlier and the later half in time of each day.
 
     Args:
-        flows: the (day, timestamp, row_id) of every kept flow of one label.
+        flows: the (day, timestamp, row_id) of every kept flow of one label, days in the order they first appear.
         novel: whether the label is held out as novel. A novel label has no pool half.
 
     Returns:
@@ -136,7 +135,7 @@ def halves(flows: list[tuple[str, str, int]], novel: bool) -> tuple[list[int], l
     """
     pool: list[int] = []
     test: list[int] = []
-    for day in DAYS:
+    for day in dict.fromkeys(flow_day for flow_day, _, _ in flows):
         day_flows = sorted((datetime.fromisoformat(timestamp), row_id) for flow_day, timestamp, row_id in flows if flow_day == day)
         in_time = [row_id for _, row_id in day_flows]
         half = 0 if novel else len(in_time) // 2
@@ -145,7 +144,9 @@ def halves(flows: list[tuple[str, str, int]], novel: bool) -> tuple[list[int], l
     return pool, test
 
 
-def choose(kept: dict[str, list[tuple[str, str, int]]], config: Config, seed: int, caps: tuple[Caps, Caps]) -> dict[int, str]:
+def choose(
+    kept: dict[str, list[tuple[str, str, int]]], config: Config, seed: int, caps: tuple[Caps, Caps], novel_labels: frozenset[str]
+) -> dict[int, str]:
     """The side, "pool" or "test", of every chosen row_id: per day, the earlier half of a label may go to the pool, the later to the test.
 
     Args:
@@ -153,6 +154,7 @@ def choose(kept: dict[str, list[tuple[str, str, int]]], config: Config, seed: in
         config: the dataset card, which names the benign label.
         seed: the seed of the capped samples.
         caps: the caps of the pool and of the test, which then sample each side of a label over all its days.
+        novel_labels: the raw labels held out of the pool.
 
     Returns:
         The side of every chosen row_id.
@@ -160,7 +162,7 @@ def choose(kept: dict[str, list[tuple[str, str, int]]], config: Config, seed: in
     rng = random.Random(seed)  # noqa: S311  seeded, reproducible sample
     side: dict[int, str] = {}
     for label in sorted(kept):
-        pool, test = halves(kept[label], label in NOVEL_LABELS)
+        pool, test = halves(kept[label], label in novel_labels)
         for name, candidates, cap in (("pool", pool, caps[0]), ("test", test, caps[1])):
             limit = cap.benign if label == config["benign"] else cap.attack
             side.update(dict.fromkeys(rng.sample(candidates, min(limit, len(candidates))), name))
@@ -198,10 +200,8 @@ def collect(raw: Path, config: Config, side: dict[int, str]) -> dict[str, list[l
     return rows
 
 
-def manifest(
-    raw: Path, seed: int, caps: tuple[Caps, Caps], dropped: Counter[str], rows: dict[str, list[list[object]]]
-) -> dict[str, object]:
-    """The preparation half of SOURCE.json: what was read, what was dropped and held out, and what each file holds."""
+def manifest(raw: Path, seed: int, caps: tuple[Caps, Caps], dropped: Counter[str]) -> dict[str, object]:
+    """The preparation facts of SOURCE.json: what was read, what was dropped and what was held out."""
     with raw.open("rb") as handle:
         sha256 = hashlib.file_digest(handle, "sha256").hexdigest()
     return {
@@ -215,18 +215,23 @@ def manifest(
         "novel_labels": sorted(NOVEL_LABELS),
         "dropped_labels": sorted(DROPPED_LABELS) + [f"* {ATTEMPTED_SUFFIX.strip()}"],
         "dropped_rows": dict(sorted(dropped.items())),
-        "rows_by_label": {name: dict(sorted(Counter(str(row[-1]) for row in side_rows).items())) for name, side_rows in rows.items()},
-        "prepared_on": datetime.now(UTC).date().isoformat(),
     }
 
 
-def prepare(raw: Path, out: Path, seed: int, caps: tuple[Caps, Caps] = (POOL_CAPS, TEST_CAPS)) -> None:
-    """Write pool.csv, test.csv and splits/SOURCE.json next to the card in `out`; splits already drawn keep their entries."""
-    config = load_config(out / "dataset.json")
-    kept, dropped = index_flows(raw, config)
-    rows = collect(raw, config, choose(kept, config, seed, caps))
+def write_prepared(
+    out: Path, config: Config, rows: dict[str, list[list[object]]], extra_columns: tuple[str, ...], facts: dict[str, object]
+) -> None:
+    """Write pool.csv and test.csv next to the card, then merge the facts and what each file holds into splits/SOURCE.json.
+
+    Args:
+        out: the folder holding the card.
+        config: the dataset card.
+        rows: the rows of pool.csv and of test.csv, the raw label last.
+        extra_columns: the trace columns that follow the shared ones.
+        facts: what the preparation read, dropped and held out. Splits already drawn keep their entries.
+    """
     for name, side_rows in rows.items():
-        write_split(out / f"{name}.csv", split_header(config, "end", *EXTRA_COLUMNS), side_rows)
+        write_split(out / f"{name}.csv", split_header(config, "end", *extra_columns), side_rows)
         print(f"{out / name}.csv: {len(side_rows)} rows")
     source_path = out / "splits" / "SOURCE.json"
     source: dict[str, object] = {
@@ -235,14 +240,24 @@ def prepare(raw: Path, out: Path, seed: int, caps: tuple[Caps, Caps] = (POOL_CAP
     }
     if source_path.exists():
         source = json.loads(source_path.read_text(encoding="utf-8"))
-    source.update(manifest(raw, seed, caps, dropped, rows))
+    source.update(facts)
+    source["rows_by_label"] = {name: dict(sorted(Counter(str(row[-1]) for row in side_rows).items())) for name, side_rows in rows.items()}
+    source["prepared_on"] = datetime.now(UTC).date().isoformat()
     source_path.parent.mkdir(parents=True, exist_ok=True)
     source_path.write_text(json.dumps(source, indent=2) + "\n", encoding="utf-8")
 
 
+def prepare(raw: Path, out: Path, seed: int, caps: tuple[Caps, Caps] = (POOL_CAPS, TEST_CAPS)) -> None:
+    """Write pool.csv, test.csv and splits/SOURCE.json next to the card in `out`; splits already drawn keep their entries."""
+    config = load_config(out / "dataset.json")
+    kept, dropped = index_flows(raw, config)
+    rows = collect(raw, config, choose(kept, config, seed, caps, NOVEL_LABELS))
+    write_prepared(out, config, rows, EXTRA_COLUMNS, manifest(raw, seed, caps, dropped))
+
+
 def main() -> None:
     """Parse the command line and prepare the dataset."""
-    parser = argparse.ArgumentParser(description="prepare CIC-IDS2017 (improved) for Jev IDS")
+    parser = argparse.ArgumentParser(description="prepare CIC-IDS2017 (improved) for JevIDS")
     parser.add_argument("--raw", type=Path, default=Path("data/raw/cicids2017") / ZIP_NAME, help="the downloaded zip")
     parser.add_argument("--out", type=Path, default=Path("data/cicids2017"), help="folder holding dataset.json")
     parser.add_argument("--seed", type=int, default=20261027, help="seed of the capped samples")

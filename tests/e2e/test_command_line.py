@@ -7,7 +7,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 REPOSITORY = HERE.parents[1]
 RUN = "tests/e2e/fixtures/validation-run"
-# Naming each reference file with the arguments that produce it, recorded at commit 1539fbe.
+# Naming each reference file with the arguments that produce it.
 REFERENCES = {
     "metrics.csv": ["metrics", RUN],
     "metrics-at-0.3.csv": ["metrics", RUN, "--threshold", "0.3"],

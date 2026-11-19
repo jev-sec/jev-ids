@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
+from jev_ids.dataset import vocabulary
 from jev_ids.detectors import knn
-from jev_ids.detectors.random_forest import vocabulary
 from jev_ids.selector import Space
 from tests.helpers import CONFIG, make_flow
 

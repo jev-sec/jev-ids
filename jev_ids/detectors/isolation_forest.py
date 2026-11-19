@@ -21,40 +21,16 @@ from typing import Any
 from sklearn.ensemble import IsolationForest  # pyright: ignore[reportMissingTypeStubs]  scikit-learn ships no type stubs
 
 from jev_ids.dataset import Flow
-from jev_ids.detectors.random_forest import Encoder, Vocabulary
-
-N_ESTIMATORS = 100
-RANDOM_STATE = 0
+from jev_ids.detectors.random_forest import N_ESTIMATORS, RANDOM_STATE, ForestDetector
 
 
-class IsolationForestDetector:
-    """Scores Flows with an IsolationForest fitted on the benign Examples of the cell."""
+class IsolationForestDetector(ForestDetector):
+    """Scores Flows with an IsolationForest fitted on the benign Examples of the cell, the only ones it learns from."""
 
     name = "isolation_forest"
-    # Storing no prompt hash, because the forest reads no prompt.
-    prompt_hash = None
-    # Feeding the forest the values themselves, never rounded (docs/jevids-design.md, D7).
-    record = "full"
-
-    def __init__(self, vocabulary: Vocabulary, benign: str, jobs: int = 1) -> None:
-        """Keep the encoding and the benign label; fitting waits for `predict`.
-
-        Args:
-            vocabulary: the symbolic values of the pool (see `random_forest.vocabulary`).
-            benign: the card's benign category, the only one the forest is fitted on.
-            jobs: CPU cores a fit may use, scikit-learn's `n_jobs` (-1 for all).
-                The fixed `random_state` makes the forest the same for any value.
-        """
-        self.encoder = Encoder(vocabulary)
-        self.benign = benign
-        self.jobs = jobs
-        self.model = f"sklearn-isolation-forest-{N_ESTIMATORS}"
-        self.fit_count = 0
-        # Fitting once per Examples list (by identity), as the Random Forest does, so every rep of a cell reuses the same forest.
-        self._fitted_on_examples_id: int | None = None
-        self._forest: Any = None
-        self._train_flows = 0
-        self._train_time_ms = 0.0
+    model = f"sklearn-isolation-forest-{N_ESTIMATORS}"
+    # Counting the benign Flows of the last fit, repeated in every row of its cell.
+    _train_flows = 0
 
     def predict(self, flow: Flow, examples: Sequence[Flow]) -> dict[str, Any]:
         """One Flow: p_attack = the anomaly score, the benign Flows fitted on, timings.

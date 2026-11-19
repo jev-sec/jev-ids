@@ -4,236 +4,189 @@
 UV_PROJECT_ENVIRONMENT ?= $(HOME)/.venvs/jev-ids
 export UV_PROJECT_ENVIRONMENT
 
-# Quality gate (added by /quality-init). Thresholds live in pyproject.toml / eslint.config.mjs.
-.PHONY: check fast check-py check-ts check-dup
+# Running the quality gate (added by /code-quality:setup), whose thresholds live in pyproject.toml / eslint.config.mjs
+# Each check is one target. `make list` shows them by moment.
+# To skip one, add `name = "reason"` under [tool.code-quality.skip] in pyproject.toml.
+SHELL := bash
 
-check: check-py check-ts check-dup
+# Pinning the tools that run outside the lock file, so a new release never changes the gate by surprise
+RUFF := uvx ruff@0.17.5
+COMPLEXIPY := uvx complexipy@9.0.0
+PIP_AUDIT := uvx pip-audit@2.10.1
+JSCPD := npx jscpd@5.4.3
 
-fast:
-	@[ ! -f pyproject.toml ] || (uvx ruff check . && uvx ruff format --check . && uvx complexipy -q --max-complexity-allowed 15 .)
-	@[ ! -f package.json ] || (npx eslint . && npx prettier --check .)
+# Checking the edited file when the hook passes FILE, and the whole project otherwise
+TARGET := $(or $(FILE),.)
+PYFILES = $$(git ls-files -co --exclude-standard '*.py') /dev/null
+READ_SKIPS = python3 -c 'import sys, tomllib; skips = tomllib.load(open("pyproject.toml", "rb")).get("tool", {}).get("code-quality", {}).get("skip", {}); print(*(skips if sys.argv[1] == "names" else [f"skipped {name}: {reason}" for name, reason in skips.items()]), sep=" " if sys.argv[1] == "names" else "\n")'
+SKIP := $(shell [ ! -f pyproject.toml ] || $(READ_SKIPS) names)
 
-check-py:
-	@[ ! -f pyproject.toml ] || (uvx ruff check . && uvx ruff format --check . \
-	  && uvx complexipy -q --max-complexity-allowed 15 . \
-	  && uv run pyright && uv run pytest && uv run vulture \
-	  && uv export --format requirements-txt --no-hashes -q | uvx pip-audit --no-deps --disable-pip -r /dev/stdin)
+# Listing the checks of each moment, by language
+PY := $(wildcard pyproject.toml)
+TS := $(wildcard package.json)
+EDIT := format lint complexity
+TURN := $(if $(PY),format lint complexity types tests dead-code class-size file-length suppressions lock) $(if $(TS),ts-fast) duplication
+COMMIT := $(if $(PY),audit) $(if $(TS),ts-audit) test-guard
+EXTRA := $(if $(PY),e2e imports) $(if $(TS),ts-check)
+active = $(filter-out $(SKIP),$(1))
+# Ending a failed check with one line that says how to fix it
+fix = || { echo "FIX $@: $(1)" >&2; exit 1; }
 
-check-ts:
-	@[ ! -f package.json ] || (npx tsc --noEmit && npx eslint . && npx prettier --check . \
+.PHONY: check turn commit edit list skipped report mutation run-check run-turn \
+  format lint complexity types tests dead-code class-size file-length suppressions lock \
+  duplication audit test-guard e2e imports ts-fast ts-check ts-audit
+
+# Saving the output of the last run with its commit, so a report can quote it.
+# Running every check even after one fails (-k), so one run shows all the failures
+check turn:
+	@mkdir -p .quality && bash -o pipefail -c '{ git rev-parse HEAD 2>/dev/null; $(MAKE) -s -k run-$@; } 2>&1 | tee .quality/last-$@.txt'
+
+run-turn: skipped $(call active,$(TURN)) report
+run-check: skipped $(call active,$(TURN) $(COMMIT) $(EXTRA)) report
+commit: skipped $(call active,$(COMMIT))
+edit: $(call active,$(EDIT))
+
+list:
+	@printf 'edit    %s\nturn    %s\ncommit  %s\ncheck   adds %s\nskipped %s\n' "$(EDIT)" "$(strip $(TURN))" "$(strip $(COMMIT))" "$(strip $(EXTRA))" "$(or $(SKIP),none)"
+
+skipped:
+	@[ ! -f pyproject.toml ] || $(READ_SKIPS) reasons
+
+format:
+	@$(if $(FILE),$(RUFF) format -q "$(FILE)",$(RUFF) format --check .) $(call fix,run: $(RUFF) format .)
+
+lint:
+	@$(RUFF) check $(TARGET) $(call fix,refactor the code. A suppression is the last resort and names the rule and its reason)
+
+complexity:
+	@$(COMPLEXIPY) -q $(TARGET) $(call fix,simplify or inline before splitting the function)
+
+types:
+	@uv run pyright $(call fix,correct the types. cast and Any hide the error)
+
+tests:
+	@uv run pytest -q $(call fix,fix the code under test. Weakening a test or the coverage threshold is silencing)
+
+dead-code:
+	@uv run vulture $(call fix,delete the unused code)
+
+# Counting instance attributes and public methods per class, and attributes first set outside __init__
+class-size:
+	@uv run pylint $(PYFILES) $(call fix,split the class by responsibility or group related attributes into one value)
+
+# Counting lines without blanks and comments, the same way the TypeScript limit does
+file-length:
+	@awk 'FNR==1{n=0} NF && !/^[[:space:]]*#/{n++} n==401{print FILENAME ": more than 400 code lines"; bad=1} END{exit bad}' $(PYFILES) $(call fix,split the module by feature)
+
+# Requiring a reason after the rule code of every suppression
+suppressions:
+	@! grep -nE '#[[:space:]]*(noqa|type: ignore|pyright: ignore)(:[[:space:]]*[A-Z0-9, ]+|\[[^]]*\])?[[:space:]]*$$' $(PYFILES) $(call fix,write the rule code and then the reason on the same line)
+
+lock:
+	@uv lock --check -q $(call fix,run: uv lock)
+
+duplication:
+	@$(JSCPD) . $(call fix,merge the repeated code into one place)
+
+audit:
+	@bash -o pipefail -c 'uv export --format requirements-txt --no-hashes -q | $(PIP_AUDIT) --no-deps --disable-pip -r /dev/stdin' $(call fix,upgrade the dependency or ignore the advisory by ID with a dated reason)
+
+# Comparing the staged change with the last commit, so no test or threshold gets weaker unnoticed
+test-guard:
+	@python3 "$$(git rev-parse --git-path hooks)/code-quality-test-guard.py" $(call fix,restore the tests. When the expected behavior really changed then ask the user before committing with --no-verify)
+
+e2e:
+	@find tests/e2e -name 'test_*.py' 2>/dev/null | grep -q . $(call fix,add an end-to-end test under tests/e2e that runs the program the way its user does)
+
+# Failing on import cycles between features when [tool.importlinter] is configured
+imports:
+	@! grep -q '^\[tool.importlinter\]' pyproject.toml || uv run lint-imports $(call fix,remove the import cycle)
+
+ts-fast:
+	@npx eslint . && npx prettier --check .
+
+ts-check:
+	@npx tsc --noEmit \
+	  && (find tests/e2e -name '*.test.*' 2>/dev/null | grep -q . || (echo "tests/e2e has no end-to-end test" >&2; exit 1)) \
 	  && npx vitest run --coverage && npx knip \
-	  && npx madge --circular --extensions ts,tsx --exclude 'node_modules|\.next|dist' . \
-	  && npm audit --audit-level=high)
+	  && npx madge --circular --extensions ts,tsx --exclude 'node_modules|\.next|dist' .
 
-check-dup:
-	@npx jscpd .
+ts-audit:
+	@npm audit --audit-level=high
 
-# Paper protocol (docs/protocol.md): the four detectors over the `paper` split of CIC-IDS2017 into results/paper-cicids2017/, then the
-# summary; NSL-KDD is frozen (docs/jevids-design.md, D1), and `make paper DATASET=nsl-kdd` writes into results/paper/, the published
-# runs. Each detector is its own target so they can run in separate terminals; `paper` runs them one after the other. The LLM is the slow
-# one, about 1.7 s per flow, so it is split into one target per k, each its own run directory: `make -j5 paper-llm` runs the five at
-# once; `metrics` and `compare --b` take the five directories together. k stops at 8 since 2026-09-22 (docs/protocol.md).
+# Reporting counts that inform a review and never fail the gate
+report:
+	@[ ! -f pyproject.toml ] || echo "report: cast=$$(grep -hoE '\bcast\(' $(PYFILES) | wc -l | tr -d ' ') suppressions=$$(grep -hoE '#[[:space:]]*(noqa|type: ignore|pyright: ignore)' $(PYFILES) | wc -l | tr -d ' ')"
+
+# Running mutation testing, which is slow, so it stays outside `check` and runs before a release
+mutation:
+	@[ ! -f pyproject.toml ] || uv run mutmut run
+	@[ ! -f package.json ] || npx stryker run
+
+
+# The zero-day battery of docs/jevids-design.md. DATASET picks CIC-IDS2017 (split `paper-v3`) or TRUSTLab (split `paper`), as in
+# `make -k zeroday-jev DATASET=trustlab`. A run that ends with no error row leaves a stamp in results/zeroday-<dataset>/v2-done/ holding
+# the name of its directory, and make skips every run whose stamp exists, so the same command resumes a chain that was cut. Each stamp
+# names the directory its own run printed, so `make -j` may run several runs at the same time. caffeinate keeps the Mac awake meanwhile.
 DATASET ?= cicids2017
-PAPER_DIR = results/paper$(if $(filter-out nsl-kdd,$(DATASET)),-$(DATASET))
-PAPER_RUN = uv run jev-ids run --dataset data/$(DATASET)/dataset.json --split paper --results-dir $(PAPER_DIR) --seeds 0,1,2
-LLM_KS = 0 1 2 4 8
-# The LLM baseline of the paper: override with `make paper-llm LLM=openai LLM_MODEL=gpt-5.6-luna`.
-LLM ?= gemini
-LLM_MODEL ?= gemini-3.6-flash
-.PHONY: paper paper-jev paper-llm paper-random-forest paper-isolation-forest paper-summary
-
-paper: paper-jev paper-llm paper-random-forest paper-isolation-forest paper-summary
-
-paper-jev:
-	$(PAPER_RUN) --detector jev --k 0,1,2,4,8
-
-paper-llm: $(addprefix paper-llm-k,$(LLM_KS))
-
-paper-llm-k%:
-	$(PAPER_RUN) --detector llm:$(LLM) --model $(LLM_MODEL) --k $*
-
-paper-random-forest:
-	$(PAPER_RUN) --detector random_forest --k 1,2,4,8,all
-
-paper-isolation-forest:
-	$(PAPER_RUN) --detector isolation_forest --k all
-
-# The tables of the paper: the summary (Tables 2, 3 and 5), the flow-level sign tests (Table 4 and Jev against the Random Forest) and the
-# McNemar test per seed.
-paper-summary:
-	uv run jev-ids metrics $(PAPER_DIR)/*/ > $(PAPER_DIR)/summary.csv
-	uv run jev-ids sign-test --a $(PAPER_DIR)/*-jev-paper/ --b $(PAPER_DIR)/*-llm-gemini-paper/ > $(PAPER_DIR)/sign-test-jev-gemini.csv
-	uv run jev-ids sign-test --a $(PAPER_DIR)/*-jev-paper/ --b $(PAPER_DIR)/*-random_forest-paper/ > $(PAPER_DIR)/sign-test-jev-random_forest.csv
-	for subset in all known novel; do \
-	  uv run jev-ids compare --a $(PAPER_DIR)/*-jev-paper/ --b $(PAPER_DIR)/*-llm-gemini-paper/ --subset $$subset \
-	    > $(PAPER_DIR)/compare-jev-gemini-$$subset.csv; \
-	done
-
-# Stage 6 (docs/jevids-design.md, "Stage 6 in slots"): the paper split of CIC-IDS2017 read once, in 15 slots of 60 to 90 minutes,
-# each a chain of whole runs that needs nobody at the keyboard. A stream run cannot be redone (`redo-errors` refuses it), so a slot cut
-# midway loses the run it was in and keeps the finished ones. `make -k stage6-N` goes on to the next run when one fails, `make -k stage6`
-# runs every slot in order, and caffeinate keeps the Mac awake while a run lasts. A run that ends well leaves a stamp holding the name of
-# its directory in results/design-cicids2017/stage6-done/, and make skips every run whose stamp exists, so the same command resumes a cut
-# chain at the run that was cut.
-#
-# Each Jev run holds one seed and its stamp is `<line>-d<D>-s<seed>`. Since 2026-11-01, to fit the TypeSafe credits left ("Changes after
-# results"), the full system and Jev at a fixed k = 1 run STAGE6_SEEDS and every other Jev line runs STAGE6_FEW_SEEDS. Setting either on
-# the command line, as in `make -k stage6 STAGE6_FEW_SEEDS="0 1 2"`, runs only the seeds still without a stamp.
+SPLIT_cicids2017 = paper-v3
+SPLIT_trustlab = paper
+RESULTS = results/zeroday-$(DATASET)
+DONE = $(RESULTS)/v2-done
 KEEP_AWAKE = $(if $(shell command -v caffeinate),caffeinate -i)
-STAGE6_RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/cicids2017/dataset.json --split paper \
-  --results-dir results/design-cicids2017 --delay
-STAGE6_SEEDS = 0 1 2
-STAGE6_FEW_SEEDS = 0
-# Reading D and the seed from the stem of a Jev stamp, `500-s2` for `full-d500-s2`.
-stage6_d = $(firstword $(subst -s, ,$*))
-stage6_seed = $(lastword $(subst -s, ,$*))
-STAGE6_JEV = $(stage6_d) --detector jev --seeds $(stage6_seed)
-STAGE6_ONCE = --k all --seeds 0
-STAGE6_DONE = results/design-cicids2017/stage6-done
+RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/$(DATASET)/dataset.json --split $(SPLIT_$(DATASET)) --results-dir $(RESULTS) --delay
+# The Examples of Jev alone: the `Selector`'s choice plus the nearest benign Flow.
+ANCHOR = --selection score+nearest
+# Reading D and the seed from the stem of a stamp, `200-s2` for `full-d200-s2`.
+SEEDED = $(firstword $(subst -s, ,$*)) --seeds $(lastword $(subst -s, ,$*))
+JEV = $(SEEDED) --detector jev
+ONCE = --k all --seeds 0
 # The stamps of the Jev lines in $(1) at the delay $(2), one per seed in $(3).
-stage6_jev = $(foreach line,$(1),$(foreach seed,$(3),$(STAGE6_DONE)/$(line)-d$(2)-s$(seed)))
-# Withholding the stamp when any row of the run just made, the newest directory, holds an error, so the next `make -k stage6` runs it
-# again. Added on 2026-11-01, after the TypeSafe credits ran out in slot 7 and six runs of nothing but HTTP 402 rows were stamped.
-STAGE6_STAMP = run=$$(ls -td results/design-cicids2017/*-paper | head -1) && ! grep -q '"error"' $$run/predictions.jsonl \
-  && mkdir -p $(@D) && basename $$run > $@
-STAGE6_SLOTS = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
-.PHONY: stage6 $(addprefix stage6-,$(STAGE6_SLOTS))
+jev_stamps = $(foreach line,$(1),$(foreach seed,$(3),$(DONE)/$(line)-d$(2)-s$(seed)))
+# Running one battery run with the arguments $(1) and stamping it with the directory its own `done:` line names.
+# The stamp is withheld when the run wrote no row or any row holds an error, so the next call runs it again.
+stamped_run = set -o pipefail && run=$$(PYTHONUNBUFFERED=1 $(RUN) $(1) | tee /dev/stderr | sed -n 's/^done: //p') \
+  && [ -s "$$run/predictions.jsonl" ] && ! grep -q '"error"' $$run/predictions.jsonl && mkdir -p $(@D) && basename $$run > $@
+.PHONY: zeroday-cut zeroday-knn-cut zeroday-jev zeroday-baselines zeroday-sonnet paper-numbers
 
-stage6: $(addprefix stage6-,$(STAGE6_SLOTS))
+# Running Jev alone over the development stream of data/<dataset>-dev at D = 200, seeds 0 to 2, for the cut (D9).
+zeroday-cut:
+	$(KEEP_AWAKE) uv run jev-ids run --dataset data/$(DATASET)-dev/dataset.json --split validation \
+	  --results-dir $(RESULTS)-dev --delay 200 --detector jev --k 1 --seeds 0,1,2 --control aimd $(ANCHOR)
+# Running the matched kNN over the same stream, whose scores give the fusion its percentiles and its cut.
+# It is deterministic and free, so one seed suffices.
+zeroday-knn-cut:
+	uv run jev-ids run --dataset data/$(DATASET)-dev/dataset.json --split validation \
+	  --results-dir $(RESULTS)-dev-knn --delay 200 --detector knn --k all --seeds 0 --neighbours matched:4
+# The Jev runs of the paper, Jev alone at D = 200 first: 17 on CIC-IDS2017, which repeats D = 50 and D = 1 over three seeds,
+# and 13 on TRUSTLab, which runs them with seed 0. Then the 12 baseline runs and the 3 Sonnet 5.5 runs at D = 200.
+JEV_DELAYS_cicids2017 = $(call jev_stamps,full,50,0 1 2) $(call jev_stamps,full,1,0 1 2)
+JEV_DELAYS_trustlab = $(call jev_stamps,full,50,0) $(call jev_stamps,full,1,0)
+zeroday-jev: $(call jev_stamps,full,200,0 1 2) $(JEV_DELAYS_$(DATASET)) \
+  $(call jev_stamps,fixedk1 noctl,200,0 1 2) $(call jev_stamps,nosel randomk4,200,0)
+zeroday-baselines: $(foreach d,200 50 1,$(addprefix $(DONE)/,$(addsuffix -d$(d),rf if knn4 knnmatched)))
+zeroday-sonnet: $(call jev_stamps,sonnet,200,0 1 2)
+# Writing results/paper/numbers.json from every stamped run of both datasets, the numbers of the paper.
+paper-numbers:
+	uv run python scripts/paper_numbers.py
 
-# Slots 1 to 4 at D = 1, 5 to 8 at D = 100, 9 to 12 at D = 500, then the β check at each D.
-stage6-1: $(call stage6_jev,full,1,$(STAGE6_SEEDS)) $(addprefix $(STAGE6_DONE)/,if-d1 knn4-d1 knnmatched-d1)
-stage6-2: $(call stage6_jev,fixedk1,1,$(STAGE6_SEEDS)) $(STAGE6_DONE)/rf-d1
-stage6-3: $(call stage6_jev,randomk4 noctl,1,$(STAGE6_FEW_SEEDS))
-stage6-4: $(call stage6_jev,nosel nocompact,1,$(STAGE6_FEW_SEEDS))
-stage6-5: $(call stage6_jev,full,100,$(STAGE6_SEEDS)) $(addprefix $(STAGE6_DONE)/,if-d100 knn4-d100 knnmatched-d100)
-stage6-6: $(call stage6_jev,fixedk1,100,$(STAGE6_SEEDS)) $(STAGE6_DONE)/rf-d100
-stage6-7: $(call stage6_jev,randomk4 noctl,100,$(STAGE6_FEW_SEEDS))
-stage6-8: $(call stage6_jev,nosel nocompact,100,$(STAGE6_FEW_SEEDS))
-stage6-9: $(call stage6_jev,full,500,$(STAGE6_SEEDS)) $(addprefix $(STAGE6_DONE)/,if-d500 knn4-d500 knnmatched-d500)
-stage6-10: $(call stage6_jev,fixedk1,500,$(STAGE6_SEEDS)) $(STAGE6_DONE)/rf-d500
-stage6-11: $(call stage6_jev,randomk4 noctl,500,$(STAGE6_FEW_SEEDS))
-stage6-12: $(call stage6_jev,nosel nocompact,500,$(STAGE6_FEW_SEEDS))
-stage6-13: $(call stage6_jev,beta1.5 beta3,1,$(STAGE6_FEW_SEEDS))
-stage6-14: $(call stage6_jev,beta1.5 beta3,100,$(STAGE6_FEW_SEEDS))
-stage6-15: $(call stage6_jev,beta1.5 beta3,500,$(STAGE6_FEW_SEEDS))
-
-$(STAGE6_DONE)/full-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 1 --control aimd
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/fixedk1-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 1
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/randomk4-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 4 --selection random
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/noctl-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 4
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/nosel-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 1 --selection random --control aimd
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/nocompact-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 1 --control aimd --record full
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/beta1.5-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 1 --control aimd --beta 1.5
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/beta3-d%:
-	$(STAGE6_RUN) $(STAGE6_JEV) --k 1 --control aimd --beta 3
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/rf-d%:
-	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector random_forest
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/if-d%:
-	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector isolation_forest
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/knn4-d%:
-	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours 4
-	$(STAGE6_STAMP)
-$(STAGE6_DONE)/knnmatched-d%:
-	$(STAGE6_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours matched:4
-	$(STAGE6_STAMP)
-
-# Stage 6 again, on the fresh split paper-v2 (docs/jevids-design.md, "2026-11-02: the nearest benign Flow and paper-v2"). The full
-# system now adds the nearest benign Flow to its Examples (`--selection score+nearest`), and D takes 1, 250 and 500. `make v2-cut` runs
-# the full system over the validation stream first, and `jev-ids threshold` takes the cut from its rows. `make -k v2` then runs phase 1,
-# one target per D, each with the full system at seeds 0 to 2 and the four baselines of D10. `make -k v2-phase2` runs the rest of the
-# battery and waits for the rule the design document fixes. Stamps go to results/design-cicids2017/v2-done/ and resume a cut chain as
-# in stage 6. Each stamp names the newest directory of its own Detector, so a Jev chain and a baseline chain may run at the same time.
-V2_RUN = $(KEEP_AWAKE) uv run jev-ids run --dataset data/cicids2017/dataset.json --split paper-v2 \
-  --results-dir results/design-cicids2017 --delay
-V2_ANCHOR = --selection score+nearest
-V2_DONE = results/design-cicids2017/v2-done
-V2_DELAYS = 1 250 500
-# The stamps of the Jev lines in $(1) at the delay $(2), one per seed in $(3).
-v2_jev = $(foreach line,$(1),$(foreach seed,$(3),$(V2_DONE)/$(line)-d$(2)-s$(seed)))
-# Withholding the stamp when any row of the newest run of the Detector $(1) holds an error, as in stage 6.
-v2_stamp = run=$$(ls -td results/design-cicids2017/*-$(1)-paper-v2 | head -1) && ! grep -q '"error"' $$run/predictions.jsonl \
-  && mkdir -p $(@D) && basename $$run > $@
-V2_BASELINES = rf if knn4 knnmatched
-.PHONY: v2-cut v2 v2-phase2 $(addprefix v2-d,$(V2_DELAYS))
-
-v2-cut:
-	$(KEEP_AWAKE) uv run jev-ids run --dataset data/cicids2017/dataset.json --split validation \
-	  --results-dir results/design-cicids2017 --delay 1 --detector jev --k 1 --seeds 0,1,2 --control aimd $(V2_ANCHOR)
-
-v2: $(addprefix v2-d,$(V2_DELAYS))
-
-v2-d1: $(call v2_jev,full,1,0 1 2) $(addprefix $(V2_DONE)/,$(addsuffix -d1,$(V2_BASELINES)))
-v2-d250: $(call v2_jev,full,250,0 1 2) $(addprefix $(V2_DONE)/,$(addsuffix -d250,$(V2_BASELINES)))
-v2-d500: $(call v2_jev,full,500,0 1 2) $(addprefix $(V2_DONE)/,$(addsuffix -d500,$(V2_BASELINES)))
-
-v2-phase2: $(foreach d,$(V2_DELAYS),$(call v2_jev,nonearest fixedk1,$(d),0 1 2) $(call v2_jev,randomk4 noctl nosel nocompact,$(d),0)) \
-  $(call v2_jev,beta1.5 beta3,500,0)
-
-# Running the paper battery, which replaces phase 2 at seed 0 only (design document, "2026-11-02: D from the bursts and the paper
-# battery"). The Jev chain runs the full system at the new delays, V0 at every D, the other ablations at D = 1, 50 and 200 and β at
-# D = 200, in that order, so the runs that matter most come first if the credits run out. The runs of phase 1 at D = 1 count.
-V2_PAPER_DELAYS = 25 50 100 200
-V2_PAPER_ABLATIONS = nosel fixedk1 noctl nocompact randomk4
-.PHONY: v2-paper-jev v2-paper-baselines
-
-v2-paper-jev: $(foreach d,$(V2_PAPER_DELAYS),$(call v2_jev,full,$(d),0)) $(foreach d,1 $(V2_PAPER_DELAYS),$(call v2_jev,nonearest,$(d),0)) \
-  $(foreach line,$(V2_PAPER_ABLATIONS),$(foreach d,1 50 200,$(call v2_jev,$(line),$(d),0))) $(call v2_jev,beta1.5 beta3,200,0)
-v2-paper-baselines: $(foreach d,$(V2_PAPER_DELAYS),$(addprefix $(V2_DONE)/,$(addsuffix -d$(d),$(V2_BASELINES))))
-
-$(V2_DONE)/full-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd $(V2_ANCHOR)
-	$(call v2_stamp,jev)
-$(V2_DONE)/nonearest-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --selection score
-	$(call v2_stamp,jev)
-$(V2_DONE)/fixedk1-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 1 $(V2_ANCHOR)
-	$(call v2_stamp,jev)
-$(V2_DONE)/randomk4-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 4 --selection random
-	$(call v2_stamp,jev)
-$(V2_DONE)/noctl-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 4 $(V2_ANCHOR)
-	$(call v2_stamp,jev)
-$(V2_DONE)/nosel-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 1 --selection random --control aimd
-	$(call v2_stamp,jev)
-$(V2_DONE)/nocompact-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --record full $(V2_ANCHOR)
-	$(call v2_stamp,jev)
-$(V2_DONE)/beta1.5-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --beta 1.5 $(V2_ANCHOR)
-	$(call v2_stamp,jev)
-$(V2_DONE)/beta3-d%:
-	$(V2_RUN) $(STAGE6_JEV) --k 1 --control aimd --beta 3 $(V2_ANCHOR)
-	$(call v2_stamp,jev)
-$(V2_DONE)/rf-d%:
-	$(V2_RUN) $* $(STAGE6_ONCE) --detector random_forest
-	$(call v2_stamp,random_forest)
-$(V2_DONE)/if-d%:
-	$(V2_RUN) $* $(STAGE6_ONCE) --detector isolation_forest
-	$(call v2_stamp,isolation_forest)
-$(V2_DONE)/knn4-d%:
-	$(V2_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours 4
-	$(call v2_stamp,knn)
-$(V2_DONE)/knnmatched-d%:
-	$(V2_RUN) $* $(STAGE6_ONCE) --detector knn --neighbours matched:4
-	$(call v2_stamp,knn)
+$(DONE)/full-d%:
+	$(call stamped_run,$(JEV) --k 1 --control aimd $(ANCHOR))
+$(DONE)/fixedk1-d%:
+	$(call stamped_run,$(JEV) --k 1 $(ANCHOR))
+$(DONE)/randomk4-d%:
+	$(call stamped_run,$(JEV) --k 4 --selection random)
+$(DONE)/noctl-d%:
+	$(call stamped_run,$(JEV) --k 4 $(ANCHOR))
+$(DONE)/nosel-d%:
+	$(call stamped_run,$(JEV) --k 1 --selection random --control aimd)
+$(DONE)/sonnet-d%:
+	$(call stamped_run,$(SEEDED) --detector llm:sonnet --k 1 --control aimd $(ANCHOR))
+$(DONE)/rf-d%:
+	$(call stamped_run,$* $(ONCE) --detector random_forest)
+$(DONE)/if-d%:
+	$(call stamped_run,$* $(ONCE) --detector isolation_forest)
+$(DONE)/knn4-d%:
+	$(call stamped_run,$* $(ONCE) --detector knn --neighbours 4)
+$(DONE)/knnmatched-d%:
+	$(call stamped_run,$* $(ONCE) --detector knn --neighbours matched:4)

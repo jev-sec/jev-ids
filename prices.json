@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-21",
+  "date": "2026-11-17",
   "unit": "USD per 1M tokens",
   "models": {
     "jev-1.13.0": {
@@ -9,41 +9,12 @@
       "source": "https://docs.typesafe.ai/models",
       "note": "TypeSafe direct list price: input only, output tokens are free, no cache discount."
     },
-    "typesafe-ai/jev": {
-      "input": 0.042,
-      "cached_input": 0.042,
-      "output": 0.0,
-      "source": "https://vercel.com/ai-gateway/models/jev",
-      "note": "The runs up to 2026-09-21 went through the Vercel AI Gateway under this id; list price, billed 0 under the promotion that ended on 2026-09-25."
-    },
-    "deepseek-flash": {
-      "input": 0.3,
-      "cached_input": 0.006,
-      "output": 1.2,
-      "source": "https://api-docs.deepseek.com/quick_start/pricing/",
-      "note": "Peak list prices; off-peak is half (peak: 01:00-04:00 and 06:00-10:00 UTC, Mon-Fri)."
-    },
-    "gpt-5.6-luna": {
-      "input": 0.2,
-      "cached_input": 0.02,
-      "output": 1.2,
-      "source": "https://developers.openai.com/api/docs/pricing",
-      "note": "Public API list price, used as the cost proxy for the subscription path (billed 0)."
-    },
-    "gpt-5.6-terra": {
+    "claude-sonnet-5-5": {
       "input": 2.0,
-      "cached_input": 0.2,
-      "output": 12.0,
-      "source": "https://developers.openai.com/api/docs/pricing",
-      "note": "Public API list price; fallback model if the Codex backend refuses luna on a Free account."
-    },
-    "gemini-3.6-flash": {
-      "input": 0.75,
-      "cached_input": 0.075,
-      "output": 3.75,
-      "reasoning_outside_output": true,
-      "source": "https://ai.google.dev/gemini-api/docs/pricing",
-      "note": "Paid-tier list price through 2026-12-31, read 2026-09-22 (doubles to 1.50 / 0.15 / 7.50 from 2027-01-01); Vertex reports thinking tokens apart from output_tokens and bills them as output; the per-hour cache storage fee is not modeled."
+      "cached_input": 0.1,
+      "output": 10.0,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "note": "List price read 2026-11-17. Output tokens include any thinking. Prompt caching is off in the runs."
     }
   }
 }

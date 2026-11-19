@@ -2,8 +2,8 @@
 
 import pytest
 
-from jev_ids.dataset import Flow
-from jev_ids.detectors import isolation_forest, random_forest
+from jev_ids.dataset import Flow, vocabulary
+from jev_ids.detectors import isolation_forest
 from tests.helpers import CONFIG
 
 
@@ -16,7 +16,7 @@ def flow(row_id: int, category: str, bytes_: str) -> Flow:
 NORMALS = [flow(index, "normal", str(300 + index)) for index in range(32)]
 ATTACKS = [flow(32, "dos", "0"), flow(33, "probe", "2")]
 POOL = NORMALS + ATTACKS
-VOCABULARY = random_forest.vocabulary(POOL, CONFIG)
+VOCABULARY = vocabulary(POOL, CONFIG)
 
 
 def test_predict_fits_on_the_benign_examples_once_and_scores_the_far_flow_higher() -> None:

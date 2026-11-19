@@ -43,15 +43,15 @@ def test_load_split_rejects_unknown_categories_and_missing_features(
 ) -> None:
     config = dataset.load_config(write_dataset(tmp_path, CONFIG, {}))
     path = tmp_path / "bad.csv"
-    dataset.write_split(path, SHARED_HEADER, [[1, 0, 0, 0, "u2r", 0]])
-    with pytest.raises(ValueError, match="row 1: category 'u2r' is not in the card"):
+    dataset.write_split(path, SHARED_HEADER, [[1, 0, 0, 0, "worm", 0]])
+    with pytest.raises(ValueError, match="row 1: category 'worm' is not in the card"):
         dataset.load_split(path, config)
     dataset.write_split(path, SHARED_HEADER[:3] + SHARED_HEADER[4:], [[1, 0, 0, "dos", 0]])
     with pytest.raises(KeyError, match="c"):
         dataset.load_split(path, config)
 
 
-@pytest.mark.parametrize(("name", "features", "categories"), [("nsl-kdd", 41, 5), ("cicids2017", 83, 6)])
+@pytest.mark.parametrize(("name", "features", "categories"), [("cicids2017", 78, 6), ("trustlab", 70, 16)])
 def test_each_committed_card_is_consistent(name: str, features: int, categories: int) -> None:
     config = dataset.load_config(ROOT / "data" / name / "dataset.json")
     assert config["name"] == name
@@ -63,13 +63,9 @@ def test_each_committed_card_is_consistent(name: str, features: int, categories:
     assert set(config["attack_names"]) == set(config["categories"]) - {config["benign"]}
 
 
-def test_the_nsl_kdd_card_maps_every_attack_name() -> None:
-    config = dataset.load_config(ROOT / "data" / "nsl-kdd" / "dataset.json")
-    assert sum(len(names) for names in config["attack_names"].values()) == 39
-
-
 def test_compact_value_keeps_four_significant_digits_and_the_order_of_magnitude() -> None:
-    # Keeping the order of magnitude of large and small values without an exponent, the proof of stage 2 (docs/jevids-design.md, D7).
+    # Keeping the order of magnitude of large and small values without an exponent,
+    # the proof of the compact record (docs/jevids-design.md, D7).
     cases = {
         "25160.418777440053": "25160",
         "168.86187098953056": "168.9",

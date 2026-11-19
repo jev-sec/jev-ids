@@ -1,0 +1,35 @@
+{
+  "model": "jev-1.13.0",
+  "state": {
+    "instructions": "You are given one record of a network flow, described by the columns listed below. Decide whether the flow is an intrusion attempt or normal traffic, and which category it belongs to. Labeled example records may be provided; use them as reference. Judge the record by its own values: do not assume a category is present only because it appears among the examples.",
+    "columns": "Dst Port,Protocol,Flow Duration,Total Fwd Packet,Total Bwd packets,Total Length of Fwd Packet,Total Length of Bwd Packet,Fwd Packet Length Max,Fwd Packet Length Min,Fwd Packet Length Mean,Fwd Packet Length Std,Bwd Packet Length Max,Bwd Packet Length Min,Bwd Packet Length Mean,Bwd Packet Length Std,Flow Bytes/s,Flow Packets/s,Flow IAT Mean,Flow IAT Std,Flow IAT Max,Flow IAT Min,Fwd IAT Total,Fwd IAT Mean,Fwd IAT Std,Fwd IAT Max,Fwd IAT Min,Bwd IAT Total,Bwd IAT Mean,Bwd IAT Std,Bwd IAT Max,Bwd IAT Min,Fwd PSH Flags,Bwd PSH Flags,Fwd URG Flags,Bwd URG Flags,Packet Length Min,Packet Length Max,Packet Length Mean,Packet Length Std,Packet Length Variance,FIN Flag Count,SYN Flag Count,RST Flag Count,PSH Flag Count,ACK Flag Count,URG Flag Count,CWR Flag Count,ECE Flag Count,Down/Up Ratio,Average Packet Size,Fwd Segment Size Avg,Bwd Segment Size Avg,Fwd Bytes/Bulk Avg,Fwd Packet/Bulk Avg,Fwd Bulk Rate Avg,Bwd Bytes/Bulk Avg,Bwd Packet/Bulk Avg,Bwd Bulk Rate Avg,Subflow Fwd Packets,Subflow Fwd Bytes,Subflow Bwd Packets,Subflow Bwd Bytes,Active Mean,Active Std,Active Max,Active Min,Idle Mean,Idle Std,Idle Max,Idle Min",
+    "categories": {
+      "BENIGN": "legitimate traffic of the testbed users and services, such as web browsing, e-mail, file downloads and streaming.",
+      "API": "attacks on REST, GraphQL or SOAP interfaces through crafted requests.",
+      "Bruteforce": "repeated login attempts against a service, guessing credentials.",
+      "BufferOverflow": "requests that overflow a buffer of a network service.",
+      "C2Beaconing": "an infected host contacting its command-and-control server at regular intervals.",
+      "DDoS": "distributed denial of service, several hosts flooding one target at the same time.",
+      "DNS": "abuse of the DNS protocol, such as amplification or flooding.",
+      "DoS": "denial of service from one host, flooding a target with packets or requests.",
+      "Evasion": "traffic crafted to slip past detection, such as fragmented packets or unusual TTL values.",
+      "Exfiltration": "data copied out of the network to a host outside it.",
+      "Exploitation": "exploits against vulnerable network services.",
+      "MITM": "a man-in-the-middle host intercepting or relaying the traffic between two others.",
+      "PortScan": "scans that probe the ports of the hosts of the network.",
+      "Slowloris": "slow requests that hold the connections of a web server open until it runs out of them.",
+      "TLSSSL": "anomalous TLS or SSL handshakes and sessions.",
+      "WebBased": "attacks on a web application through crafted requests, such as injected queries or scripts."
+    }
+  },
+  "questions": {
+    "is_attack": {
+      "type": "noul",
+      "instructions": "Is the flow `flows.under_test` an intrusion attempt rather than normal traffic? Judge it by `instructions` and `columns`, and by the labeled `examples` when they are present."
+    },
+    "category": {
+      "type": "choice",
+      "instructions": "Which category in `categories` does the flow `flows.under_test` belong to?"
+    }
+  }
+}

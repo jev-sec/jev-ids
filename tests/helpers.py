@@ -88,11 +88,14 @@ def write_dataset(root: Path, config: Config, splits: Mapping[str, Sequence[Flow
     folder.mkdir(parents=True, exist_ok=True)
     card = folder / "dataset.json"
     card.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    header = split_header(config)
     for name, flows in splits.items():
         path = folder / "pool.csv" if name == "pool" else folder / "splits" / f"{name}.csv"
-        rows = [[flow.row_id, *flow.attribute_values, flow.category, int(flow.novel_attack)] for flow in flows]
-        write_split(path, header, rows)
+        # Writing the `end` column when the Flows have one, so a stream can run on the dataset.
+        timed = all(flow.end is not None for flow in flows)
+        rows = [
+            [flow.row_id, *flow.attribute_values, flow.category, int(flow.novel_attack), *([flow.end] if timed else [])] for flow in flows
+        ]
+        write_split(path, split_header(config, *(["end"] if timed else [])), rows)
     return card
 
 

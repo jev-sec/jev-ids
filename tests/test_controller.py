@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from jev_ids import controller, selector, stream
-from jev_ids.detectors.random_forest import vocabulary
+from jev_ids.dataset import vocabulary
 from tests.helpers import CONFIG, make_flow, make_prediction
 
 CATEGORIES: list[str] = CONFIG["categories"]
@@ -30,7 +30,7 @@ def test_an_error_doubles_k_up_to_eight() -> None:
     # Counting a missing Category answer as an error too.
     kc.feedback(row("probe", None))
     assert kc.k["probe"] == 2.0
-    # Tripling k instead under β = 3, a value of stage 6's sensitivity check.
+    # Tripling k instead under β = 3, as `--beta 3` asks.
     tripled = controller.KController(CATEGORIES, beta=3.0)
     for expected in (3.0, 8.0):
         tripled.feedback(row("dos", "normal"))

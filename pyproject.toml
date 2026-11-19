@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
 dependencies = [
-    "agno[openai,google]>=3.0.10",
+    "agno[anthropic]>=3.0.10",
     "python-dotenv>=1.2.3",
     "requests>=2.34.2",
     "scikit-learn>=1.9.1",
@@ -24,18 +24,43 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["jev_ids"]
 
-# --- quality gate (added by /quality-init); thresholds live here ---
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.0",
+    "import-linter>=2.16",
+    "kaggle>=2.2.4",
+    "mutmut>=3.8.1",
+    "pylint>=4.1.3",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "types-requests>=2.33.0.20260906",
+    "vulture>=2.16",
+]
+
+# Configuring the quality gate (added by /code-quality:setup), whose thresholds live here
 [tool.ruff]
 line-length = 140
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "C90", "PL", "S", "D"]
+# Enabling preview only for the rules selected by their exact code (PLW1514 and PLR6301)
+preview = true
+explicit-preview-rules = true
+select = ["E", "F", "I", "B", "UP", "SIM", "C90", "PL", "S", "D", "TID251", "ARG", "BLE", "PGH003", "PGH004", "RUF100", "PLW1514", "PLR6301"]
+ignore = ["D100", "D104", "D105", "D107"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "D", "ARG"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "PLR2004", "D"]
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"__future__".msg = "Python 3.13+ project"
+"unittest.mock".msg = "Test through real collaborators. Mock only at an external boundary, with a noqa that states the reason."
+
+[tool.complexipy]
+max-complexity-allowed = 15
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -48,27 +73,52 @@ max-statements = 50
 
 [tool.pyright]
 typeCheckingMode = "strict"
+# Keeping pyright's default exclusions and adding the copies mutmut writes to mutants/ and the git-ignored dev-docs/
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", "mutants", "dev-docs"]
+reportUnnecessaryTypeIgnoreComment = true
 
 [tool.pytest.ini_options]
-addopts = "--cov --cov-fail-under=80"
+addopts = "--cov --cov-fail-under=80 --strict-markers --strict-config"
+xfail_strict = true
+filterwarnings = ["error"]
 testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.coverage.run]
+branch = true
+# Listing files no test imports, and counting code that end-to-end tests run as a separate process
+source = ["."]
+patch = ["subprocess"]
 omit = ["tests/*"]
+
+[tool.mutmut]
+source_paths = ["jev_ids"]
+# Disabling the coverage gate inside mutant runs, so a low-coverage run never counts as a killed mutant
+pytest_add_cli_args = ["--no-cov"]
+
+[tool.importlinter]
+root_package = "jev_ids"
+
+[[tool.importlinter.contracts]]
+name = "Features of jev_ids import no cycle"
+type = "acyclic_siblings"
+ancestors = ["jev_ids"]
 
 [tool.vulture]
 paths = ["."]
-exclude = [".venv/", "tests/"]
+exclude = [".venv/", "tests/", "mutants/"]
 min_confidence = 80
 
-[dependency-groups]
-dev = [
-    "httpx2>=2.13.0",
-    "kaggle>=2.2.4",
-    "pyright>=1.1.414",
-    "pytest>=9.1.1",
-    "pytest-cov>=7.1.0",
-    "types-requests>=2.33.0.20260906",
-    "vulture>=2.16",
-]
+# Running only the class size checks, since ruff already covers the rest of pylint
+[tool.pylint.main]
+disable = ["all"]
+enable = ["too-many-instance-attributes", "too-many-public-methods", "attribute-defined-outside-init"]
+score = false
+
+[tool.pylint.design]
+max-attributes = 10
+max-public-methods = 20
+
+# Skipping a check of the gate, one `name = "reason"` line each. `make list` shows the names.
+[tool.code-quality.skip]
+class-size = "RunSpec is written to each run's config.json and read back by redo-errors"

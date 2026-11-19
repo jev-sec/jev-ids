@@ -57,10 +57,9 @@ def test_metrics_prints_one_csv_over_every_run_given(tmp_path: Path, capsys: pyt
     # (the first run's only attack is a known dos), then the alert counts, then the two areas, which a single-class cell leaves empty,
     # then the error rate. The second run has no attack, so its category columns stay empty.
     assert (
-        lines[1]
-        == "test,jev,m,internal,,full,random,fixed,,1,1,1,1,1.0,1.0,1.0,,1.0,,,1.0,1.0,,0.0,0.0,,,0.0,,100.0,10.0,,,,,500.0,500.0,,"
+        lines[1] == "test,jev,m,internal,,full,random,fixed,,1,1,1,1,1.0,1.0,1.0,,1.0,,,1.0,1.0,,0.0,0.0,,,0.0,,100.0,10.0,,500.0,500.0,,"
     )
-    assert lines[2] == "test,random_forest,m,internal,,full,random,fixed,,1,1,1,1,,,,,,,,,,,0.0,0.0,,,0.0,,,,,,,,500.0,500.0,,2.0"
+    assert lines[2] == "test,random_forest,m,internal,,full,random,fixed,,1,1,1,1,,,,,,,,,,,0.0,0.0,,,0.0,,,,,500.0,500.0,,2.0"
     assert cli.main(["metrics", str(tmp_path / "empty")]) == 0
     assert capsys.readouterr().out == ""
 

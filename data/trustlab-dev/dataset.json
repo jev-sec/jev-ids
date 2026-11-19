@@ -1,0 +1,145 @@
+{
+  "name": "trustlab",
+  "source": "https://doi.org/10.82432/10317/21203",
+  "features": [
+    "Dst Port",
+    "Protocol",
+    "Flow Duration",
+    "Total Fwd Packet",
+    "Total Bwd packets",
+    "Total Length of Fwd Packet",
+    "Total Length of Bwd Packet",
+    "Fwd Packet Length Max",
+    "Fwd Packet Length Min",
+    "Fwd Packet Length Mean",
+    "Fwd Packet Length Std",
+    "Bwd Packet Length Max",
+    "Bwd Packet Length Min",
+    "Bwd Packet Length Mean",
+    "Bwd Packet Length Std",
+    "Flow Bytes/s",
+    "Flow Packets/s",
+    "Flow IAT Mean",
+    "Flow IAT Std",
+    "Flow IAT Max",
+    "Flow IAT Min",
+    "Fwd IAT Total",
+    "Fwd IAT Mean",
+    "Fwd IAT Std",
+    "Fwd IAT Max",
+    "Fwd IAT Min",
+    "Bwd IAT Total",
+    "Bwd IAT Mean",
+    "Bwd IAT Std",
+    "Bwd IAT Max",
+    "Bwd IAT Min",
+    "Fwd PSH Flags",
+    "Bwd PSH Flags",
+    "Fwd URG Flags",
+    "Bwd URG Flags",
+    "Packet Length Min",
+    "Packet Length Max",
+    "Packet Length Mean",
+    "Packet Length Std",
+    "Packet Length Variance",
+    "FIN Flag Count",
+    "SYN Flag Count",
+    "RST Flag Count",
+    "PSH Flag Count",
+    "ACK Flag Count",
+    "URG Flag Count",
+    "CWR Flag Count",
+    "ECE Flag Count",
+    "Down/Up Ratio",
+    "Average Packet Size",
+    "Fwd Segment Size Avg",
+    "Bwd Segment Size Avg",
+    "Fwd Bytes/Bulk Avg",
+    "Fwd Packet/Bulk Avg",
+    "Fwd Bulk Rate Avg",
+    "Bwd Bytes/Bulk Avg",
+    "Bwd Packet/Bulk Avg",
+    "Bwd Bulk Rate Avg",
+    "Subflow Fwd Packets",
+    "Subflow Fwd Bytes",
+    "Subflow Bwd Packets",
+    "Subflow Bwd Bytes",
+    "Active Mean",
+    "Active Std",
+    "Active Max",
+    "Active Min",
+    "Idle Mean",
+    "Idle Std",
+    "Idle Max",
+    "Idle Min"
+  ],
+  "symbolic": [
+    "Protocol"
+  ],
+  "categories": [
+    "BENIGN",
+    "API",
+    "Bruteforce",
+    "BufferOverflow",
+    "C2Beaconing",
+    "DDoS",
+    "DNS",
+    "DoS",
+    "Evasion",
+    "Exfiltration",
+    "Exploitation",
+    "MITM",
+    "PortScan",
+    "Slowloris",
+    "TLSSSL",
+    "WebBased"
+  ],
+  "benign": "BENIGN",
+  "attack_names": {
+    "API": [
+      "API"
+    ],
+    "Bruteforce": [
+      "Bruteforce"
+    ],
+    "BufferOverflow": [
+      "BufferOverflow"
+    ],
+    "C2Beaconing": [
+      "C2Beaconing"
+    ],
+    "DDoS": [
+      "DDoS"
+    ],
+    "DNS": [
+      "DNS"
+    ],
+    "DoS": [
+      "DoS"
+    ],
+    "Evasion": [
+      "Evasion"
+    ],
+    "Exfiltration": [
+      "Exfiltration"
+    ],
+    "Exploitation": [
+      "Exploitation"
+    ],
+    "MITM": [
+      "MITM"
+    ],
+    "PortScan": [
+      "PortScan"
+    ],
+    "Slowloris": [
+      "Slowloris"
+    ],
+    "TLSSSL": [
+      "TLSSSL"
+    ],
+    "WebBased": [
+      "WebBased"
+    ]
+  }
+}

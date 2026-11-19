@@ -24,7 +24,7 @@ FLOWS = [
     make_flow(101, "dos", value="7", novel_attack=True),
     make_flow(102, "probe", value="7"),
 ]
-NSL_KDD = ROOT / "data" / "nsl-kdd" / "dataset.json"
+TRUSTLAB = ROOT / "data" / "trustlab" / "dataset.json"
 
 
 class FakeDetector(jev.JevDetector):
@@ -208,34 +208,33 @@ def test_build_detector_knows_the_five_names(card: Path) -> None:
     isolation = run.build_detector(run.RunSpec("isolation_forest", card, "smoke", (None,), (0,)), config)
     assert isinstance(isolation, IsolationForestDetector)
     assert (isolation.encoder.vocabulary, isolation.benign) == (forest.encoder.vocabulary, "normal")
-    nsl_kdd = dataset.load_config(NSL_KDD)
-    jev_spec = run.RunSpec("jev", NSL_KDD, "smoke", (0,), (0,))
-    judge = run.build_detector(jev_spec, nsl_kdd)
+    trustlab = dataset.load_config(TRUSTLAB)
+    jev_spec = run.RunSpec("jev", TRUSTLAB, "smoke", (0,), (0,))
+    judge = run.build_detector(jev_spec, trustlab)
     assert judge.name == "jev"
     assert len(judge.prompt_hash or "") == 64
-    deepseek_spec = run.RunSpec("llm:deepseek", NSL_KDD, "smoke", (0,), (0,))
-    deepseek = run.build_detector(deepseek_spec, nsl_kdd)
-    assert (deepseek.name, deepseek.model) == ("llm:deepseek", "deepseek-flash")
-    terra_spec = run.RunSpec("llm:openai", NSL_KDD, "smoke", (0,), (0,), model_id="gpt-5.6-terra")
-    assert run.build_detector(terra_spec, nsl_kdd).model == "gpt-5.6-terra"
+    sonnet = run.build_detector(run.RunSpec("llm:sonnet", TRUSTLAB, "smoke", (0,), (0,)), trustlab)
+    assert (sonnet.name, sonnet.model) == ("llm:sonnet", "claude-sonnet-5-5")
+    other_spec = run.RunSpec("llm:sonnet", TRUSTLAB, "smoke", (0,), (0,), model_id="claude-opus-5-5")
+    assert run.build_detector(other_spec, trustlab).model == "claude-opus-5-5"
     with pytest.raises(NotImplementedError):
         run.build_detector(run.RunSpec("unknown", card, "smoke", (0,), (0,)), config)
 
 
 def test_run_dir_name_has_timestamp_dataset_detector_and_split(card: Path) -> None:
-    run_dir = run.execute(smoke_spec(card, "llm:deepseek"), FakeDetector(), dataset.load_config(card), FLOWS, TRAIN)
-    # Expecting the colon of `llm:deepseek` as a dash in the name, because a colon is not a path character.
-    assert re.fullmatch(r"\d{8}T\d{6}\.\d{6}Z-test-llm-deepseek-smoke", run_dir.name)
+    run_dir = run.execute(smoke_spec(card, "llm:sonnet"), FakeDetector(), dataset.load_config(card), FLOWS, TRAIN)
+    # Expecting the colon of `llm:sonnet` as a dash in the name, because a colon is not a path character.
+    assert re.fullmatch(r"\d{8}T\d{6}\.\d{6}Z-test-llm-sonnet-smoke", run_dir.name)
 
 
 def test_k_all_is_for_the_forests_only_and_each_forest_has_its_k_guard() -> None:
     with pytest.raises(ValueError, match="only meaningful for the forests and the kNN"):
-        run.check_spec(run.RunSpec("jev", NSL_KDD, "smoke", (None,), (0,)), "jev")
+        run.check_spec(run.RunSpec("jev", TRUSTLAB, "smoke", (None,), (0,)), "jev")
     with pytest.raises(ValueError, match="starts at k = 1"):
-        run.check_spec(run.RunSpec("random_forest", NSL_KDD, "smoke", (0, 1), (0,)), "random_forest")
+        run.check_spec(run.RunSpec("random_forest", TRUSTLAB, "smoke", (0, 1), (0,)), "random_forest")
     with pytest.raises(ValueError, match="k = all only"):
-        run.check_spec(run.RunSpec("isolation_forest", NSL_KDD, "smoke", (1, None), (0,)), "isolation_forest")
-    run.check_spec(run.RunSpec("isolation_forest", NSL_KDD, "smoke", (None,), (0,)), "isolation_forest")
+        run.check_spec(run.RunSpec("isolation_forest", TRUSTLAB, "smoke", (1, None), (0,)), "isolation_forest")
+    run.check_spec(run.RunSpec("isolation_forest", TRUSTLAB, "smoke", (None,), (0,)), "isolation_forest")
 
 
 def test_sample_examples_is_balanced_nested_and_deterministic() -> None:
@@ -251,7 +250,7 @@ def test_sample_examples_is_balanced_nested_and_deterministic() -> None:
     with pytest.raises(ValueError, match="k = 3 asked"):
         run.sample_examples(TRAIN, 3, 0, CATEGORIES)
     # Drawing no Examples from a Category held out of the pool.
-    assert run.sample_examples(TRAIN, 1, 0, [*CATEGORIES, "r2l"]) == k1
+    assert run.sample_examples(TRAIN, 1, 0, [*CATEGORIES, "botnet"]) == k1
 
 
 def test_load_prompt_hashes_the_bytes(tmp_path: Path) -> None:
@@ -264,7 +263,7 @@ def test_load_prompt_hashes_the_bytes(tmp_path: Path) -> None:
     }
 
 
-@pytest.mark.parametrize("name", ["nsl-kdd", "cicids2017"])
+@pytest.mark.parametrize("name", ["cicids2017", "trustlab"])
 def test_each_committed_prompt_pair_matches_its_card(name: str) -> None:
     config = dataset.load_config(ROOT / "data" / name / "dataset.json")
     body = json.loads(run.load_prompt(ROOT / "prompts" / name / "jev.json")["text"])
@@ -284,7 +283,7 @@ def test_each_committed_prompt_pair_matches_its_card(name: str) -> None:
 
 
 def test_selection_is_score_in_a_stream_random_outside_and_none_for_the_forests() -> None:
-    stream_spec = run.RunSpec("jev", NSL_KDD, "smoke", (4,), (0,), delay=1)
+    stream_spec = run.RunSpec("jev", TRUSTLAB, "smoke", (4,), (0,), delay=1)
     assert run.selection_of(stream_spec, "jev") == "score"
     assert run.selection_of(replace(stream_spec, selection="random"), "jev") == "random"
     assert run.selection_of(replace(stream_spec, delay=None), "jev") == "random"
@@ -329,7 +328,7 @@ def test_the_knn_needs_its_neighbours_and_the_whole_memory(card: Path) -> None:
 
 @pytest.mark.parametrize("selection", ["score", "random"])
 def test_aimd_needs_a_stream_from_k_one_and_writes_k_per_category(card: Path, selection: str) -> None:
-    # Running the full system (score) and stage 6's ablation without the `Selector` (random), both under the `KController`.
+    # Running Jev alone (score) and the ablation without the `Selector` (random), both under the `KController`.
     spec = replace(smoke_spec(card, k_values=(1,)), delay=1, control="aimd", selection=selection, beta=3.0)
     run.check_spec(spec, "jev")
     # Refusing a β other than 2 without the `KController` it belongs to.

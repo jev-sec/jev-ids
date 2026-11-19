@@ -1,5 +1,6 @@
 {
-  "threshold": 3,
+  "threshold": 0,
+  "exitCode": 1,
   "minTokens": 50,
   "reporters": ["console"],
   "gitignore": true,
@@ -13,6 +14,10 @@
     "**/*.lock",
     "**/package-lock.json",
     "**/*.log",
-    "**/results/**"
+    "**/results/**",
+    "data/**",
+    "prompts/**",
+    "reports/*.html",
+    "docs/*.svg"
   ]
 }

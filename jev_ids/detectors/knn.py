@@ -6,7 +6,7 @@ In reading order:
 - `KNNDetector`: `predict` finds the K nearest Flows of the whole visible memory and lets them vote.
 - `matched_count`: how many Examples the `Selector` gives Jev at k per Category for the same memory, the K of the matched variant.
 
-If this vote matches Jev IDS, Jev adds nothing to the neighbours it is shown. Two values of K were fixed on 2026-10-28, before any kNN
+If this vote matches Jev alone, Jev adds nothing to the neighbours it is shown. Two values of K were fixed on 2026-10-28, before any kNN
 result: K = 4, a plain nearest-neighbour vote, and `matched:4`, as many neighbours as Jev reads at k = 4, so both read the same number of
 Flows. The kNN reads the values in full, like the forests, and is deterministic, so it runs with one seed.
 """
