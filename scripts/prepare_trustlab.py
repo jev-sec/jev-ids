@@ -6,7 +6,7 @@ Run once, from the repository root, after downloading the dataset of https://doi
     uv run python -m scripts.prepare_trustlab --raw <folder holding the 16 *.csv.gz>
     uv run python -m scripts.draw_split --dataset data/trustlab --name paper --size 2000 --seed 20261116
 
-TRUSTLab is the testbed of Cano Baños and Villafranca Albaladejo, Frontiers in Computer Science, 2026, doi 10.3389/fcomp.2026.1803271.
+TRUSTLab is the testbed of Villafranca, Tasic and Cano, Frontiers in Computer Science, 2026, doi 10.3389/fcomp.2026.1803271.
 Each file holds the CICFlowMeter 4.0 flows of benign sessions or of one attack family, captured apart from all others. The decisions
 below were taken on 2026-11-16 (docs/jevids-design.md, D1):
 
@@ -248,7 +248,7 @@ def prepare(raw: Path, out: Path, seed: int, caps: tuple[Caps, Caps] = (POOL_CAP
     kept, dropped = index_rows(raw)
     rows = collect(raw, config, choose(kept, config, seed, caps, NOVEL_LABELS))
     facts: dict[str, object] = {
-        "dataset": "TRUSTLab, Cano Baños and Villafranca Albaladejo, Frontiers in Computer Science, 2026",
+        "dataset": "TRUSTLab, Villafranca, Tasic and Cano, Frontiers in Computer Science, 2026",
         "flow_meter": "CICFlowMeter 4.0, as published",
         "seed": seed,
         "caps": {

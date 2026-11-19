@@ -20,7 +20,7 @@ Flows in order of end ──► Jev alone judges F_t ────┐
 
 ### D1. Two datasets, CIC-IDS2017 and TRUSTLab
 
-CIC-IDS2017 is read in the relabelled version of Liu et al. (IEEE CNS 2022), five days of a lab network in 2017 with six Categories. TRUSTLab (Cano Baños and Villafranca Albaladejo, Frontiers in Computer Science, 2026, doi 10.3389/fcomp.2026.1803271, data at doi 10.82432/10317/21203, CC BY 4.0) adds a recent capture with fifteen attack families. Its traffic is scripted in a lab, and each family was captured in a session of its own, without benign traffic. Both carry timestamps, which a Stream needs.
+CIC-IDS2017 is read in the relabelled version of Liu et al. (IEEE CNS 2022), five days of a lab network in 2017 with six Categories. TRUSTLab (Villafranca, Tasic and Cano, Frontiers in Computer Science, 2026, doi 10.3389/fcomp.2026.1803271, data at doi 10.82432/10317/21203, CC BY 4.0) adds a recent capture with fifteen attack families. Its traffic is scripted in a lab, and each family was captured in a session of its own, without benign traffic. Both carry timestamps, which a Stream needs.
 
 `scripts/prepare_trustlab.py` writes `data/trustlab/` by these rules, fixed on 2026-11-16 before any stream run on TRUSTLab.
 

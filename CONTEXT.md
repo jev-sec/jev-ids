@@ -7,7 +7,7 @@ Intrusion detection on network flow records with a System One Model (Jev). Jev j
 ### Data
 
 **Dataset**:
-A source of Flows prepared once into a Card, a Pool and Splits. The Datasets are CIC-IDS2017 in the relabelled version of Liu et al. (IEEE CNS 2022) and TRUSTLab (Cano Baños and Villafranca Albaladejo, Frontiers in Computer Science, 2026). A development Dataset (`cicids2017-dev`, `trustlab-dev`) is its Dataset with some attack names taken out of the Pool. Every Run names one.
+A source of Flows prepared once into a Card, a Pool and Splits. The Datasets are CIC-IDS2017 in the relabelled version of Liu et al. (IEEE CNS 2022) and TRUSTLab (Villafranca, Tasic and Cano, Frontiers in Computer Science, 2026). A development Dataset (`cicids2017-dev`, `trustlab-dev`) is its Dataset with some attack names taken out of the Pool. Every Run names one.
 _Avoid_: corpus, benchmark, source.
 
 **Card**:
