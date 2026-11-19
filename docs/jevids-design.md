@@ -44,7 +44,7 @@ The `Memory` holds every labeled Flow that has ended before "now". A pool Flow b
 
 The delay stands for the time between an attack slipping through and someone noticing it. D is the same for every Flow. A D tied to Flow Duration was rejected, because duration is a property of each attack and says nothing about its discovery. Feedback is assumed complete, so every judged Flow eventually gets its true label, missed attacks included. The paper declares this assumption.
 
-D is a scenario, reported and never tuned. Each novel attack name of the CIC-IDS2017 `paper` split arrives in one burst: `SSH-Patator` at positions 414 to 556, `DoS Slowhttptest` at 753 to 849 and `Infiltration - Portscan` at 1,279 to 1,473, so a burst spans 97 to 195 positions. D = 1 is the immediate best case, D = 50 lets a burst's first Flows come back while it lasts, and D = 200 is longer than the longest burst. At D = 1, 50 and 200 the split holds 3, 93 and 309 novel Flows at first contact. On TRUSTLab only D = 200 runs, and 338 of its 403 novel Flows meet Jev at first contact.
+D is a scenario, reported and never tuned. Each novel attack name of the CIC-IDS2017 `paper` split arrives in one burst: `SSH-Patator` at positions 414 to 556, `DoS Slowhttptest` at 753 to 849 and `Infiltration - Portscan` at 1,279 to 1,473, so a burst spans 97 to 195 positions. D = 1 is the immediate best case, D = 50 lets a burst's first Flows come back while it lasts, and D = 200 is longer than the longest burst. At D = 1, 50 and 200 the split holds 3, 93 and 309 novel Flows at first contact, and the TRUSTLab split 5, 203 and 338 of its 403.
 
 ### D5. `KController`: mirrored AIMD, one k per Category
 
@@ -132,17 +132,17 @@ The battery measures Jev alone, its ablations and the baselines on test splits t
 | Dataset     | Split   | Flows | BENIGN | Novel | Novel at first contact (D = 1 / 50 / 200) |
 | ----------- | ------- | ----- | ------ | ----- | ----------------------------------------- |
 | CIC-IDS2017 | `paper` | 2,000 | 1,046  | 309   | 3 / 93 / 309                              |
-| TRUSTLab    | `paper` | 2,000 | 798    | 403   | only D = 200 runs, 338                    |
+| TRUSTLab    | `paper` | 2,000 | 798    | 403   | 5 / 203 / 338                             |
 
 CIC-IDS2017's `paper` was drawn on 2026-11-15 as `paper-v3`, with seed 20261115 and `--min-novel 250`, from the rows of `test.csv` that earlier splits held out, and renamed on 2026-11-19. TRUSTLab's `paper` was drawn with seed 20261116.
 
-The CIC-IDS2017 battery holds 9 Jev runs and 12 baseline runs, all stamped.
+The battery holds 17 Jev runs and 12 baseline runs on CIC-IDS2017, and 13 Jev runs and 12 baseline runs on TRUSTLab, all stamped.
 
-- Jev alone runs at D = 1, 50 and 200 with seed 0, and with seeds 1 and 2 at D = 200.
-- Four ablations run at D = 200 with seed 0 on both datasets. They are the `KController` with random Examples (no `Selector`), the `Selector` at a fixed k = 1 (the `KController`'s reaction to errors removed), the `Selector` at a fixed k = 4 (no `KController`) and random Examples at a fixed k = 4.
-- The Random Forest, the Isolation Forest and both kNN run at D = 1, 50 and 200.
+- Jev alone runs at D = 200 with seeds 0, 1 and 2. At D = 1 and 50 it runs with seeds 0, 1 and 2 on CIC-IDS2017 and with seed 0 on TRUSTLab.
+- Four ablations run at D = 200 on both datasets. They are the `KController` with random Examples (no `Selector`), the `Selector` at a fixed k = 1 (the `KController`'s reaction to errors removed), the `Selector` at a fixed k = 4 (no `KController`) and random Examples at a fixed k = 4. The two with the `Selector` run with seeds 0, 1 and 2, the two with random Examples with seed 0.
+- The Random Forest, the Isolation Forest and both kNN run at D = 1, 50 and 200 with seed 0.
 
-The TRUSTLab battery holds the four baselines at D = 200, stamped, and Jev alone at D = 200 with seeds 0, 1 and 2. The three Jev runs hold the failed calls of D5, so they carry no stamp. Jev ran on TRUSTLab under a rule fixed before it, that the Random Forest at D = 200 catch fewer than 90 % of the novel Flows at first contact at 1 % or at 5 %. It caught 0 of 338 at 1 %.
+Six TRUSTLab Jev runs hold failed calls of D5, from 42 to 391 of their 2,000 rows. They are Jev alone at every D and seed and the ablation without the `Selector`. `make` withholds the stamp of a run with an error row, so their stamps were added outside `make`. Jev ran on TRUSTLab under a rule fixed before it, that the Random Forest at D = 200 catch fewer than 90 % of the novel Flows at first contact at 1 % or at 5 %. It caught 0 of 338 at 1 %.
 
 ### D12. The full JevIDS
 
