@@ -59,7 +59,7 @@ lint:
 	@$(RUFF) check $(TARGET) $(call fix,refactor the code. A suppression is the last resort and names the rule and its reason)
 
 complexity:
-	@$(COMPLEXIPY) -q $(TARGET) $(call fix,simplify or inline before splitting the function)
+	@$(COMPLEXIPY) --failed --plain $(TARGET) $(call fix,simplify or inline before splitting the function)
 
 types:
 	@uv run pyright $(call fix,correct the types. cast and Any hide the error)
